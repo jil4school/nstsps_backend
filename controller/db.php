@@ -9,7 +9,6 @@ try {
     // Set PDO error mode to exception
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     
-    echo json_encode(["success" => "Connected to database successfully."]);
 } catch (PDOException $e) {
     die(json_encode(["error" => "Database connection failed: " . $e->getMessage()]));
 }
