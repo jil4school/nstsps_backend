@@ -9,7 +9,7 @@ class MasterFile
 
     public function __construct()
     {
-        global $pdo; // Use the global PDO object from db.php
+        global $pdo;
         $this->conn = $pdo;
     }
 
