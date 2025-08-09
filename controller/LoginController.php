@@ -20,21 +20,30 @@ class LoginController extends Controller
             return ['error' => 'Email not found'];
         }
     }
+
     public function verifyOldPassword($user_id, $oldPassword)
-{
-    $this->setStatement("SELECT password FROM student_account WHERE user_id = :user_id");
-    $this->statement->execute(['user_id' => $user_id]);
-    $user = $this->statement->fetch(PDO::FETCH_ASSOC);
+    {
+        $this->setStatement("SELECT password FROM student_account WHERE user_id = :user_id");
+        $this->statement->execute(['user_id' => $user_id]);
+        $user = $this->statement->fetch(PDO::FETCH_ASSOC);
 
-    if ($user) {
-        if ($user['password'] === $oldPassword) {
-            return ['match' => true];
+        if ($user) {
+            if ($user['password'] === $oldPassword) {
+                return ['match' => true];
+            } else {
+                return ['match' => false];
+            }
         } else {
-            return ['match' => false];
+            return ['error' => 'User not found'];
         }
-    } else {
-        return ['error' => 'User not found'];
     }
-}
 
+    public function updatePassword($user_id, $newPassword)
+    {
+        $this->setStatement("UPDATE student_account SET password = :password WHERE user_id = :user_id");
+        return $this->statement->execute([
+            'password' => $newPassword,
+            'user_id'  => $user_id
+        ]);
+    }
 }
