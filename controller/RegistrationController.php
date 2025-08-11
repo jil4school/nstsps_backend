@@ -14,18 +14,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $registration = new Registration();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    if (isset($_GET['registration_id'])) {
+    if (isset($_GET['registration_id']) && isset($_GET['student_id'])) {
         $registration_id = $_GET['registration_id'];
-        $data = $registration->getStudentByRegistrationId($registration_id);
+        $student_id = $_GET['student_id']; // ✅ Now we define it
+        $user_id = isset($_GET['user_id']) ? $_GET['user_id'] : null;
+
+        if ($user_id === null) {
+            echo json_encode(["error" => "Missing user_id parameter"]);
+            http_response_code(400);
+            exit;
+        }
+
+        $data = $registration->getStudentByRegistrationAndStudentId($registration_id, $student_id, $user_id);
 
         if ($data) {
             echo json_encode($data);
         } else {
-            echo json_encode(["error" => "No student data found for that registration_id"]);
+            echo json_encode(["error" => "No student data found for that registration_id and user_id"]);
             http_response_code(404);
         }
         exit;
     }
+
 
     if (isset($_GET['user_id'])) {
         $user_id = $_GET['user_id'];

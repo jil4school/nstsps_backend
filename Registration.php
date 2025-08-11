@@ -32,8 +32,9 @@ class Registration
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC); // ← important: fetchAll
     }
-    public function getStudentByRegistrationId($registration_id)
+    public function getStudentByRegistrationAndStudentId($registration_id, $student_id, $user_id)
 {
+    // First query: student + program info
     $sql = "SELECT 
                 s.*,
                 s.school_year,
@@ -43,15 +44,51 @@ class Registration
                 m.program_id, 
                 p.program_name
             FROM `student_info(registration)` s
-            LEFT JOIN `student_info(master_file)` m ON s.user_id = m.user_id
-            LEFT JOIN program p ON m.program_id = p.program_id
-            WHERE s.registration_id = :registration_id";
+            LEFT JOIN `student_info(master_file)` m 
+                   ON s.student_id = m.student_id
+            LEFT JOIN program p 
+                   ON m.program_id = p.program_id
+            WHERE s.registration_id = :registration_id
+              AND s.student_id = :student_id
+              AND s.user_id = :user_id";
 
     $stmt = $this->conn->prepare($sql);
     $stmt->bindParam(':registration_id', $registration_id, PDO::PARAM_INT);
+    $stmt->bindParam(':student_id', $student_id, PDO::PARAM_INT);
+    $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
     $stmt->execute();
 
-    return $stmt->fetch(PDO::FETCH_ASSOC); // just one row
+    $student = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$student) {
+        return null;
+    }
+
+    // Second query: courses for that registration_id & student_id & user_id
+    $sqlCourses = "SELECT 
+                        c.course_code,
+                        c.course_description,
+                        c.unit
+                   FROM reg_courses rc
+                   INNER JOIN courses c ON rc.course_id = c.course_id
+                   INNER JOIN `student_info(registration)` s 
+                           ON rc.registration_id = s.registration_id
+                   WHERE rc.registration_id = :registration_id
+                     AND s.student_id = :student_id
+                     AND s.user_id = :user_id"; 
+
+    $stmtCourses = $this->conn->prepare($sqlCourses);
+    $stmtCourses->bindParam(':registration_id', $registration_id, PDO::PARAM_INT);
+    $stmtCourses->bindParam(':student_id', $student_id, PDO::PARAM_INT);
+    $stmtCourses->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+    $stmtCourses->execute();
+    $courses = $stmtCourses->fetchAll(PDO::FETCH_ASSOC);
+
+    $student['course_codes'] = array_column($courses, 'course_code');
+    $student['course_descriptions'] = array_column($courses, 'course_description');
+    $student['units'] = array_column($courses, 'unit');
+
+    return $student;
 }
 
 }
