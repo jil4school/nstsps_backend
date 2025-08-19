@@ -20,7 +20,7 @@ class Registration
                 m.surname AS last_name, 
                 m.first_name, 
                 m.middle_name,
-                m.program_id, p.program_name
+                m.program_id, p.program_name, m.student_id
             FROM `student_info(registration)` s
             LEFT JOIN `student_info(master_file)` m ON s.user_id = m.user_id
             LEFT JOIN program p ON m.program_id = p.program_id
@@ -30,9 +30,9 @@ class Registration
         $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
         $stmt->execute();
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC); // ← important: fetchAll
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
-    public function getStudentByRegistrationAndStudentId($registration_id, $student_id, $user_id)
+    public function getStudentByRegistrationAndStudentId($registration_id, $master_file_id, $user_id)
 {
     // First query: student + program info
     $sql = "SELECT 
@@ -42,19 +42,20 @@ class Registration
                 m.first_name, 
                 m.middle_name,
                 m.program_id, 
-                p.program_name
+                p.program_name,
+                m.student_id
             FROM `student_info(registration)` s
             LEFT JOIN `student_info(master_file)` m 
-                   ON s.student_id = m.student_id
+                   ON s.master_file_id = m.master_file_id
             LEFT JOIN program p 
                    ON m.program_id = p.program_id
             WHERE s.registration_id = :registration_id
-              AND s.student_id = :student_id
+              AND s.master_file_id = :master_file_id
               AND s.user_id = :user_id";
 
     $stmt = $this->conn->prepare($sql);
     $stmt->bindParam(':registration_id', $registration_id, PDO::PARAM_INT);
-    $stmt->bindParam(':student_id', $student_id, PDO::PARAM_INT);
+    $stmt->bindParam(':master_file_id', $master_file_id, PDO::PARAM_INT);
     $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
     $stmt->execute();
 
@@ -64,7 +65,6 @@ class Registration
         return null;
     }
 
-    // Second query: courses for that registration_id & student_id & user_id
     $sqlCourses = "SELECT 
                         c.course_code,
                         c.course_description,
@@ -74,12 +74,12 @@ class Registration
                    INNER JOIN `student_info(registration)` s 
                            ON rc.registration_id = s.registration_id
                    WHERE rc.registration_id = :registration_id
-                     AND s.student_id = :student_id
+                     AND s.master_file_id = :master_file_id
                      AND s.user_id = :user_id"; 
 
     $stmtCourses = $this->conn->prepare($sqlCourses);
     $stmtCourses->bindParam(':registration_id', $registration_id, PDO::PARAM_INT);
-    $stmtCourses->bindParam(':student_id', $student_id, PDO::PARAM_INT);
+    $stmtCourses->bindParam(':master_file_id', $master_file_id, PDO::PARAM_INT);
     $stmtCourses->bindParam(':user_id', $user_id, PDO::PARAM_INT);
     $stmtCourses->execute();
     $courses = $stmtCourses->fetchAll(PDO::FETCH_ASSOC);

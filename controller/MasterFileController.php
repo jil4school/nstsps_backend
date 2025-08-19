@@ -33,8 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
 
-    if (!isset($input['student_id'])) {
-        echo json_encode(["error" => "Missing student_id"]);
+    if (!isset($input['master_file_id'])) {
+        echo json_encode(["error" => "Missing master_file_id"]);
         http_response_code(400);
         exit;
     }

@@ -14,9 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $registration = new Registration();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    if (isset($_GET['registration_id']) && isset($_GET['student_id'])) {
+    if (isset($_GET['registration_id']) && isset($_GET['master_file_id'])) {
         $registration_id = $_GET['registration_id'];
-        $student_id = $_GET['student_id']; // ✅ Now we define it
+        $master_file_id = $_GET['master_file_id'];
         $user_id = isset($_GET['user_id']) ? $_GET['user_id'] : null;
 
         if ($user_id === null) {
@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             exit;
         }
 
-        $data = $registration->getStudentByRegistrationAndStudentId($registration_id, $student_id, $user_id);
+        $data = $registration->getStudentByRegistrationAndStudentId($registration_id, $master_file_id, $user_id);
 
         if ($data) {
             echo json_encode($data);

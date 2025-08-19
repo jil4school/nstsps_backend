@@ -12,7 +12,7 @@ class Grades
         $this->conn = $pdo;
     }
 
-    public function getGradesByStudentAndRegistration($student_id, $registration_id)
+    public function getGradesByStudentAndRegistration($master_file_id, $registration_id)
     {
         $sql = "SELECT g.*, 
                c.unit, 
@@ -20,11 +20,11 @@ class Grades
                c.course_description
         FROM `student_info(grades)` g
         LEFT JOIN courses c ON g.course_id = c.course_id
-        WHERE g.student_id = :student_id AND g.registration_id = :registration_id";
+        WHERE g.master_file_id = :master_file_id AND g.registration_id = :registration_id";
 
 
         $stmt = $this->conn->prepare($sql);
-        $stmt->bindParam(':student_id', $student_id, PDO::PARAM_STR);
+        $stmt->bindParam(':master_file_id', $master_file_id, PDO::PARAM_STR);
         $stmt->bindParam(':registration_id', $registration_id, PDO::PARAM_STR);
         $stmt->execute();
 

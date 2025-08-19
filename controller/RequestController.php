@@ -14,14 +14,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $request = new Request();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $data = [
-        'user_id' => $_POST['user_id'] ?? null,
-        'student_id' => $_POST['student_id'] ?? null,
-        'request' => $_POST['request'] ?? null,
-        'request_remarks' => $_POST['request_remarks'] ?? null,
-        'request_purpose' => $_POST['request_purpose'] ?? null,
-        'mode_of_payment' => $_POST['mode_of_payment'] ?? null,
-    ];
+   $data = [
+    'user_id' => $_POST['user_id'] ?? null,
+    'master_file_id' => $_POST['master_file_id'] ?? null,
+    'request' => $_POST['request'] ?? null,
+    'request_remarks' => $_POST['request_remarks'] ?? null,
+    'request_purpose' => $_POST['request_purpose'] ?? null,
+    'mode_of_payment' => $_POST['mode_of_payment'] ?? null,
+];
+
 
     $file = $_FILES['receipt'] ?? null;
 

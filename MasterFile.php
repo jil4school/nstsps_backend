@@ -50,11 +50,11 @@ class MasterFile
         relation_with_the_student = :relation_with_the_student,
         guardian_mobile_number = :guardian_mobile_number,
         guardian_email = :guardian_email
-    WHERE student_id = :student_id";
+    WHERE master_file_id = :master_file_id";
 
         $stmt = $this->conn->prepare($sql);
 
-        // ✅ Bind each value manually to ensure no mismatch
+        
         return $stmt->execute([
             ':program_id' => $data['program_id'] ?? null,
             ':surname' => $data['surname'] ?? null,
@@ -76,7 +76,7 @@ class MasterFile
             ':relation_with_the_student' => $data['relation_with_the_student'] ?? null,
             ':guardian_mobile_number' => $data['guardian_mobile_number'] ?? null,
             ':guardian_email' => $data['guardian_email'] ?? null,
-            ':student_id' => $data['student_id'] ?? null,
+            ':master_file_id' => $data['master_file_id'] ?? null,
         ]);
     }
 }
