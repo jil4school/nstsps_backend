@@ -54,7 +54,7 @@ class MasterFile
 
         $stmt = $this->conn->prepare($sql);
 
-        
+
         return $stmt->execute([
             ':program_id' => $data['program_id'] ?? null,
             ':surname' => $data['surname'] ?? null,
@@ -78,5 +78,89 @@ class MasterFile
             ':guardian_email' => $data['guardian_email'] ?? null,
             ':master_file_id' => $data['master_file_id'] ?? null,
         ]);
+    }
+    public function getAllStudents()
+    {
+        $sql = "SELECT s.*, p.program_name
+            FROM `student_info(master_file)` s
+            LEFT JOIN program p ON s.program_id = p.program_id";
+        $stmt = $this->conn->query($sql);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    public function insertStudent($data)
+    {
+        $sql = "INSERT INTO `student_info(master_file)` (
+        program_id,
+        surname,
+        first_name,
+        middle_name,
+        gender,
+        nationality,
+        civil_status,
+        religion,
+        birthday,
+        birthplace,
+        street,
+        barangay,
+        region,
+        municipality,
+        mobile_number,
+        guardian_surname,
+        guardian_first_name,
+        relation_with_the_student,
+        guardian_mobile_number,
+        guardian_email
+    ) VALUES (
+        :program_id,
+        :surname,
+        :first_name,
+        :middle_name,
+        :gender,
+        :nationality,
+        :civil_status,
+        :religion,
+        :birthday,
+        :birthplace,
+        :street,
+        :barangay,
+        :region,
+        :municipality,
+        :mobile_number,
+        :guardian_surname,
+        :guardian_first_name,
+        :relation_with_the_student,
+        :guardian_mobile_number,
+        :guardian_email
+    )";
+
+        $stmt = $this->conn->prepare($sql);
+
+        try {
+            return $stmt->execute([
+                ':program_id' => $data['program_id'] ?? null,
+                ':surname' => $data['surname'] ?? null,
+                ':first_name' => $data['first_name'] ?? null,
+                ':middle_name' => $data['middle_name'] ?? null,
+                ':gender' => $data['gender'] ?? null,
+                ':nationality' => $data['nationality'] ?? null,
+                ':civil_status' => $data['civil_status'] ?? null,
+                ':religion' => $data['religion'] ?? null,
+                ':birthday' => $data['birthday'] ?? null,
+                ':birthplace' => $data['birthplace'] ?? null,
+                ':street' => $data['street'] ?? null,
+                ':barangay' => $data['barangay'] ?? null,
+                ':region' => $data['region'] ?? null,
+                ':municipality' => $data['municipality'] ?? null,
+                ':mobile_number' => $data['mobile_number'] ?? null,
+                ':guardian_surname' => $data['guardian_surname'] ?? null,
+                ':guardian_first_name' => $data['guardian_first_name'] ?? null,
+                ':relation_with_the_student' => $data['relation_with_the_student'] ?? null,
+                ':guardian_mobile_number' => $data['guardian_mobile_number'] ?? null,
+                ':guardian_email' => $data['guardian_email'] ?? null,
+            ]);
+        } catch (PDOException $e) {
+            error_log("Insert failed: " . $e->getMessage());
+            return false;
+        }
     }
 }

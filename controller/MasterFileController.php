@@ -15,36 +15,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $masterFile = new MasterFile();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    if (!isset($_GET['user_id']) || empty($_GET['user_id'])) {
-        echo json_encode(["error" => "Missing user_id parameter"]);
-        http_response_code(400);
-        exit;
-    }
+    if (isset($_GET['user_id']) && !empty($_GET['user_id'])) {
+        $user_id = $_GET['user_id'];
+        $data = $masterFile->getStudentByUserId($user_id);
 
-    $user_id = $_GET['user_id'];
-    $data = $masterFile->getStudentByUserId($user_id);
-
-    if ($data) {
-        echo json_encode($data);
+        if ($data) {
+            echo json_encode($data);
+        } else {
+            echo json_encode(["error" => "Student not found"]);
+            http_response_code(404);
+        }
     } else {
-        echo json_encode(["error" => "Student not found"]);
-        http_response_code(404);
+        $data = $masterFile->getAllStudents();
+        echo json_encode($data);
     }
 } else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
 
-    if (!isset($input['master_file_id'])) {
-        echo json_encode(["error" => "Missing master_file_id"]);
-        http_response_code(400);
-        exit;
-    }
+    if (isset($input['master_file_id']) && !empty($input['master_file_id'])) {
+        // Update student
+        $result = $masterFile->updateStudent($input);
 
-    $result = $masterFile->updateStudent($input);
-
-    if ($result) {
-        echo json_encode(["message" => "Student info updated successfully"]);
+        if ($result) {
+            echo json_encode(["message" => "Student info updated successfully"]);
+        } else {
+            echo json_encode(["error" => "Failed to update student info"]);
+            http_response_code(500);
+        }
     } else {
-        echo json_encode(["error" => "Failed to update student info"]);
-        http_response_code(500);
+        // Insert new student
+        $result = $masterFile->insertStudent($input);
+
+        if ($result) {
+            echo json_encode(["message" => "Student inserted successfully"]);
+        } else {
+            echo json_encode(["error" => "Failed to insert student"]);
+            http_response_code(500);
+        }
     }
 }
