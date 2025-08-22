@@ -90,6 +90,7 @@ class MasterFile
     public function insertStudent($data)
     {
         $sql = "INSERT INTO `student_info(master_file)` (
+        student_id,
         program_id,
         surname,
         first_name,
@@ -111,6 +112,7 @@ class MasterFile
         guardian_mobile_number,
         guardian_email
     ) VALUES (
+        :student_id,
         :program_id,
         :surname,
         :first_name,
@@ -137,6 +139,7 @@ class MasterFile
 
         try {
             return $stmt->execute([
+                ':student_id' => $data['student_id'] ?? null,
                 ':program_id' => $data['program_id'] ?? null,
                 ':surname' => $data['surname'] ?? null,
                 ':first_name' => $data['first_name'] ?? null,
@@ -163,4 +166,93 @@ class MasterFile
             return false;
         }
     }
+
+    public function insertMultipleStudents(array $students)
+{
+    $sql = "INSERT INTO `student_info(master_file)` (
+        student_id,
+        program_id,
+        surname,
+        first_name,
+        middle_name,
+        gender,
+        nationality,
+        civil_status,
+        religion,
+        birthday,
+        birthplace,
+        street,
+        barangay,
+        region,
+        municipality,
+        mobile_number,
+        guardian_surname,
+        guardian_first_name,
+        relation_with_the_student,
+        guardian_mobile_number,
+        guardian_email
+    ) VALUES (
+        :student_id,
+        :program_id,
+        :surname,
+        :first_name,
+        :middle_name,
+        :gender,
+        :nationality,
+        :civil_status,
+        :religion,
+        :birthday,
+        :birthplace,
+        :street,
+        :barangay,
+        :region,
+        :municipality,
+        :mobile_number,
+        :guardian_surname,
+        :guardian_first_name,
+        :relation_with_the_student,
+        :guardian_mobile_number,
+        :guardian_email
+    )";
+
+    $stmt = $this->conn->prepare($sql);
+
+    try {
+        $this->conn->beginTransaction();
+
+        foreach ($students as $student) {
+            $stmt->execute([
+                ':student_id' => $student['student_id'] ?? null,
+                ':program_id' => $student['program_id'] ?? null,
+                ':surname' => $student['surname'] ?? null,
+                ':first_name' => $student['first_name'] ?? null,
+                ':middle_name' => $student['middle_name'] ?? null,
+                ':gender' => $student['gender'] ?? null,
+                ':nationality' => $student['nationality'] ?? null,
+                ':civil_status' => $student['civil_status'] ?? null,
+                ':religion' => $student['religion'] ?? null,
+                ':birthday' => $student['birthday'] ?? null,
+                ':birthplace' => $student['birthplace'] ?? null,
+                ':street' => $student['street'] ?? null,
+                ':barangay' => $student['barangay'] ?? null,
+                ':region' => $student['region'] ?? null,
+                ':municipality' => $student['municipality'] ?? null,
+                ':mobile_number' => $student['mobile_number'] ?? null,
+                ':guardian_surname' => $student['guardian_surname'] ?? null,
+                ':guardian_first_name' => $student['guardian_first_name'] ?? null,
+                ':relation_with_the_student' => $student['relation_with_the_student'] ?? null,
+                ':guardian_mobile_number' => $student['guardian_mobile_number'] ?? null,
+                ':guardian_email' => $student['guardian_email'] ?? null,
+            ]);
+        }
+
+        $this->conn->commit();
+        return true;
+    } catch (PDOException $e) {
+        $this->conn->rollBack();
+        error_log("Batch insert failed: " . $e->getMessage());
+        return false;
+    }
+}
+
 }
