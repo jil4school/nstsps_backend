@@ -91,56 +91,74 @@ class MasterFile
     }
     public function insertStudent($data)
     {
-        $sql = "INSERT INTO `student_info(master_file)` (
-        student_id,
-        program_id,
-        surname,
-        first_name,
-        middle_name,
-        gender,
-        nationality,
-        civil_status,
-        religion,
-        birthday,
-        birthplace,
-        street,
-        barangay,
-        region,
-        municipality,
-        mobile_number,
-        guardian_surname,
-        guardian_first_name,
-        relation_with_the_student,
-        guardian_mobile_number,
-        guardian_email
-    ) VALUES (
-        :student_id,
-        :program_id,
-        :surname,
-        :first_name,
-        :middle_name,
-        :gender,
-        :nationality,
-        :civil_status,
-        :religion,
-        :birthday,
-        :birthplace,
-        :street,
-        :barangay,
-        :region,
-        :municipality,
-        :mobile_number,
-        :guardian_surname,
-        :guardian_first_name,
-        :relation_with_the_student,
-        :guardian_mobile_number,
-        :guardian_email
-    )";
-
-        $stmt = $this->conn->prepare($sql);
-
         try {
-            return $stmt->execute([
+            $this->conn->beginTransaction();
+
+            // 1. Insert into student_account (email + role, leave password NULL)
+            $sqlAccount = "INSERT INTO student_account (email, password, role) 
+                       VALUES (:email, :password, :role)";
+            $stmtAccount = $this->conn->prepare($sqlAccount);
+            $stmtAccount->execute([
+                ':email' => $data['email'],
+                ':password' => null, // leave NULL (or you could use '' if column allows empty string)
+                ':role' => 'student' // always student by default
+            ]);
+
+            // 2. Get the generated user_id
+            $user_id = $this->conn->lastInsertId();
+
+            // 3. Insert into student_info(master_file)
+            $sqlInfo = "INSERT INTO `student_info(master_file)` (
+            user_id,
+            student_id,
+            program_id,
+            surname,
+            first_name,
+            middle_name,
+            gender,
+            nationality,
+            civil_status,
+            religion,
+            birthday,
+            birthplace,
+            street,
+            barangay,
+            region,
+            municipality,
+            mobile_number,
+            guardian_surname,
+            guardian_first_name,
+            relation_with_the_student,
+            guardian_mobile_number,
+            guardian_email
+        ) VALUES (
+            :user_id,
+            :student_id,
+            :program_id,
+            :surname,
+            :first_name,
+            :middle_name,
+            :gender,
+            :nationality,
+            :civil_status,
+            :religion,
+            :birthday,
+            :birthplace,
+            :street,
+            :barangay,
+            :region,
+            :municipality,
+            :mobile_number,
+            :guardian_surname,
+            :guardian_first_name,
+            :relation_with_the_student,
+            :guardian_mobile_number,
+            :guardian_email
+        )";
+
+            $stmtInfo = $this->conn->prepare($sqlInfo);
+            $stmtInfo->execute([
+                ':user_id' => $user_id,
                 ':student_id' => $data['student_id'] ?? null,
                 ':program_id' => $data['program_id'] ?? null,
                 ':surname' => $data['surname'] ?? null,
@@ -163,98 +181,115 @@ class MasterFile
                 ':guardian_mobile_number' => $data['guardian_mobile_number'] ?? null,
                 ':guardian_email' => $data['guardian_email'] ?? null,
             ]);
+
+            $this->conn->commit();
+            return true;
         } catch (PDOException $e) {
+            $this->conn->rollBack();
             error_log("Insert failed: " . $e->getMessage());
             return false;
         }
     }
 
     public function insertMultipleStudents(array $students)
-{
-    $sql = "INSERT INTO `student_info(master_file)` (
-        student_id,
-        program_id,
-        surname,
-        first_name,
-        middle_name,
-        gender,
-        nationality,
-        civil_status,
-        religion,
-        birthday,
-        birthplace,
-        street,
-        barangay,
-        region,
-        municipality,
-        mobile_number,
-        guardian_surname,
-        guardian_first_name,
-        relation_with_the_student,
-        guardian_mobile_number,
-        guardian_email
-    ) VALUES (
-        :student_id,
-        :program_id,
-        :surname,
-        :first_name,
-        :middle_name,
-        :gender,
-        :nationality,
-        :civil_status,
-        :religion,
-        :birthday,
-        :birthplace,
-        :street,
-        :barangay,
-        :region,
-        :municipality,
-        :mobile_number,
-        :guardian_surname,
-        :guardian_first_name,
-        :relation_with_the_student,
-        :guardian_mobile_number,
-        :guardian_email
-    )";
+    {
+        try {
+            $this->conn->beginTransaction();
 
-    $stmt = $this->conn->prepare($sql);
+            $accountSql = "INSERT INTO student_account (email, role) VALUES (:email, :role)";
+            $accountStmt = $this->conn->prepare($accountSql);
 
-    try {
-        $this->conn->beginTransaction();
+            $infoSql = "INSERT INTO `student_info(master_file)` (
+            user_id,
+            student_id,
+            program_id,
+            surname,
+            first_name,
+            middle_name,
+            gender,
+            nationality,
+            civil_status,
+            religion,
+            birthday,
+            birthplace,
+            street,
+            barangay,
+            region,
+            municipality,
+            mobile_number,
+            guardian_surname,
+            guardian_first_name,
+            relation_with_the_student,
+            guardian_mobile_number,
+            guardian_email
+        ) VALUES (
+            :user_id,
+            :student_id,
+            :program_id,
+            :surname,
+            :first_name,
+            :middle_name,
+            :gender,
+            :nationality,
+            :civil_status,
+            :religion,
+            :birthday,
+            :birthplace,
+            :street,
+            :barangay,
+            :region,
+            :municipality,
+            :mobile_number,
+            :guardian_surname,
+            :guardian_first_name,
+            :relation_with_the_student,
+            :guardian_mobile_number,
+            :guardian_email
+        )";
 
-        foreach ($students as $student) {
-            $stmt->execute([
-                ':student_id' => $student['student_id'] ?? null,
-                ':program_id' => $student['program_id'] ?? null,
-                ':surname' => $student['surname'] ?? null,
-                ':first_name' => $student['first_name'] ?? null,
-                ':middle_name' => $student['middle_name'] ?? null,
-                ':gender' => $student['gender'] ?? null,
-                ':nationality' => $student['nationality'] ?? null,
-                ':civil_status' => $student['civil_status'] ?? null,
-                ':religion' => $student['religion'] ?? null,
-                ':birthday' => $student['birthday'] ?? null,
-                ':birthplace' => $student['birthplace'] ?? null,
-                ':street' => $student['street'] ?? null,
-                ':barangay' => $student['barangay'] ?? null,
-                ':region' => $student['region'] ?? null,
-                ':municipality' => $student['municipality'] ?? null,
-                ':mobile_number' => $student['mobile_number'] ?? null,
-                ':guardian_surname' => $student['guardian_surname'] ?? null,
-                ':guardian_first_name' => $student['guardian_first_name'] ?? null,
-                ':relation_with_the_student' => $student['relation_with_the_student'] ?? null,
-                ':guardian_mobile_number' => $student['guardian_mobile_number'] ?? null,
-                ':guardian_email' => $student['guardian_email'] ?? null,
-            ]);
+            $infoStmt = $this->conn->prepare($infoSql);
+
+            foreach ($students as $student) {
+                // 1. Insert into student_account
+                $accountStmt->execute([
+                    ':email' => $student['email'],
+                    ':role'  => $student['role'] ?? 'student', // default role = student
+                ]);
+                $userId = $this->conn->lastInsertId();
+
+                // 2. Insert into student_info(master_file)
+                $infoStmt->execute([
+                    ':user_id' => $userId,
+                    ':student_id' => $student['student_id'] ?? null,
+                    ':program_id' => $student['program_id'] ?? null,
+                    ':surname' => $student['surname'] ?? null,
+                    ':first_name' => $student['first_name'] ?? null,
+                    ':middle_name' => $student['middle_name'] ?? null,
+                    ':gender' => $student['gender'] ?? null,
+                    ':nationality' => $student['nationality'] ?? null,
+                    ':civil_status' => $student['civil_status'] ?? null,
+                    ':religion' => $student['religion'] ?? null,
+                    ':birthday' => $student['birthday'] ?? null,
+                    ':birthplace' => $student['birthplace'] ?? null,
+                    ':street' => $student['street'] ?? null,
+                    ':barangay' => $student['barangay'] ?? null,
+                    ':region' => $student['region'] ?? null,
+                    ':municipality' => $student['municipality'] ?? null,
+                    ':mobile_number' => $student['mobile_number'] ?? null,
+                    ':guardian_surname' => $student['guardian_surname'] ?? null,
+                    ':guardian_first_name' => $student['guardian_first_name'] ?? null,
+                    ':relation_with_the_student' => $student['relation_with_the_student'] ?? null,
+                    ':guardian_mobile_number' => $student['guardian_mobile_number'] ?? null,
+                    ':guardian_email' => $student['guardian_email'] ?? null,
+                ]);
+            }
+
+            $this->conn->commit();
+            return true;
+        } catch (PDOException $e) {
+            $this->conn->rollBack();
+            error_log("Batch insert failed: " . $e->getMessage());
+            return false;
         }
-
-        $this->conn->commit();
-        return true;
-    } catch (PDOException $e) {
-        $this->conn->rollBack();
-        error_log("Batch insert failed: " . $e->getMessage());
-        return false;
     }
-}
-
 }
