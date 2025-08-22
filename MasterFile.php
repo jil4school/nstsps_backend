@@ -18,6 +18,7 @@ class MasterFile
         $sql = "SELECT s.*, p.program_name
             FROM `student_info(master_file)` s
             LEFT JOIN program p ON s.program_id = p.program_id
+            LEFT JOIN student_account sa ON s.user_id = sa.user_id
             WHERE s.user_id = :user_id";
         $stmt = $this->conn->prepare($sql);
         $stmt->bindParam(':user_id', $user_id, PDO::PARAM_STR);
@@ -81,8 +82,9 @@ class MasterFile
     }
     public function getAllStudents()
     {
-        $sql = "SELECT s.*, p.program_name
+        $sql = "SELECT s.*, p.program_name, sa.email
             FROM `student_info(master_file)` s
+            LEFT JOIN student_account sa ON s.user_id = sa.user_id
             LEFT JOIN program p ON s.program_id = p.program_id";
         $stmt = $this->conn->query($sql);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
