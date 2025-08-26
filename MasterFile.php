@@ -292,4 +292,37 @@ class MasterFile
             return false;
         }
     }
+    public function fetchPendingEmails()
+    {
+        $sql = "SELECT s.*, p.program_name, sa.email
+            FROM `student_info(master_file)` s
+            LEFT JOIN student_account sa ON s.user_id = sa.user_id
+            LEFT JOIN program p ON s.program_id = p.program_id
+            WHERE sa.email NOT LIKE :myEmail
+              AND sa.email NOT LIKE :nstEmail";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':myEmail' => '%@my.nst.edu.ph',
+            ':nstEmail' => '%@nst.edu.ph'
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function fetchCreatedEmails()
+    {
+        $sql = "SELECT s.*, p.program_name, sa.email
+            FROM `student_info(master_file)` s
+            LEFT JOIN student_account sa ON s.user_id = sa.user_id
+            LEFT JOIN program p ON s.program_id = p.program_id
+            WHERE sa.email LIKE :myEmail";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([
+            ':myEmail' => '%@my.nst.edu.ph'
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }

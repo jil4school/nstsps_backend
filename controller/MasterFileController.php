@@ -33,11 +33,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
             echo json_encode(["error" => "Student not found"]);
             http_response_code(404);
         }
+    } elseif (isset($_GET['type']) && $_GET['type'] === 'pending') {
+        $data = $masterFile->fetchPendingEmails();
+        echo json_encode($data);
+    } elseif (isset($_GET['type']) && $_GET['type'] === 'created') {
+        $data = $masterFile->fetchCreatedEmails();
+        echo json_encode($data);
     } else {
         $data = $masterFile->getAllStudents();
         echo json_encode($data);
     }
-} else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+}
+ else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
 
     // ---------- Batch insert ----------
