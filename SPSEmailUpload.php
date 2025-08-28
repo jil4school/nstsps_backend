@@ -22,18 +22,16 @@ class SPSEmailUpload
 
         $updatedCount = 0;
 
-        // skip header (row 1)
         for ($i = 2; $i <= count($rows); $i++) {
             $studentId = $rows[$i]['A'] ?? null;
-            $email     = $rows[$i]['F'] ?? null;  // Email is in column F
-            $password  = $rows[$i]['G'] ?? null;  // Password is in column G
+            $email     = $rows[$i]['F'] ?? null; 
+            $password  = $rows[$i]['G'] ?? null; 
 
 
             if (!$studentId || !$email) {
-                continue; // skip if missing essentials
+                continue; 
             }
 
-            // find user_id from student_info(master_file)
             $sqlUser = "SELECT user_id FROM `student_info(master_file)` WHERE student_id = :student_id";
             $stmtUser = $this->conn->prepare($sqlUser);
             $stmtUser->execute([':student_id' => $studentId]);
@@ -42,12 +40,11 @@ class SPSEmailUpload
             if ($user) {
                 $userId = $user['user_id'];
 
-                // update student_account
                 $sqlUpdate = "UPDATE student_account SET email = :email, password = :password WHERE user_id = :user_id";
                 $stmtUpdate = $this->conn->prepare($sqlUpdate);
                 $stmtUpdate->execute([
                     ':email' => $email,
-                    ':password' => $password, // ⚠️ hash if needed
+                    ':password' => $password,
                     ':user_id' => $userId
                 ]);
 

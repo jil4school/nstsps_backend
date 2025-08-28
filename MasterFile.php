@@ -1,6 +1,4 @@
 <?php
-// MasterFile.php
-
 require_once __DIR__ . '/controller/db.php';
 
 class MasterFile
@@ -82,32 +80,36 @@ class MasterFile
     }
     public function getAllStudents()
     {
-        $sql = "SELECT s.*, p.program_name, sa.email
-            FROM `student_info(master_file)` s
-            LEFT JOIN student_account sa ON s.user_id = sa.user_id
-            LEFT JOIN program p ON s.program_id = p.program_id";
+        $sql = "SELECT s.*, 
+                    p.program_name, 
+                    sa.email
+                FROM `student_info(master_file)` s
+                LEFT JOIN student_account sa 
+                    ON s.user_id = sa.user_id
+                LEFT JOIN program p 
+                    ON s.program_id = p.program_id
+                ORDER BY s.surname ASC;
+                ";
         $stmt = $this->conn->query($sql);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
     public function insertStudent($data)
     {
         try {
             $this->conn->beginTransaction();
 
-            // 1. Insert into student_account (email + role, leave password NULL)
             $sqlAccount = "INSERT INTO student_account (email, password, role) 
                        VALUES (:email, :password, :role)";
             $stmtAccount = $this->conn->prepare($sqlAccount);
             $stmtAccount->execute([
                 ':email' => $data['email'],
-                ':password' => null, // leave NULL (or you could use '' if column allows empty string)
-                ':role' => 'student' // always student by default
+                ':password' => null, 
+                ':role' => 'student'
             ]);
 
-            // 2. Get the generated user_id
             $user_id = $this->conn->lastInsertId();
 
-            // 3. Insert into student_info(master_file)
             $sqlInfo = "INSERT INTO `student_info(master_file)` (
             user_id,
             student_id,
@@ -250,14 +252,12 @@ class MasterFile
             $infoStmt = $this->conn->prepare($infoSql);
 
             foreach ($students as $student) {
-                // 1. Insert into student_account
                 $accountStmt->execute([
                     ':email' => $student['email'],
-                    ':role'  => $student['role'] ?? 'student', // default role = student
+                    ':role'  => $student['role'] ?? 'student', 
                 ]);
                 $userId = $this->conn->lastInsertId();
 
-                // 2. Insert into student_info(master_file)
                 $infoStmt->execute([
                     ':user_id' => $userId,
                     ':student_id' => $student['student_id'] ?? null,

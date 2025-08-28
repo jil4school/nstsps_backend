@@ -52,6 +52,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     echo json_encode(["error" => "Missing parameters"]);
     http_response_code(400);
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $data = json_decode(file_get_contents("php://input"), true);
+
+    $registration_id = $data['registration_id'] ?? null;
+    $master_file_id = $data['master_file_id'] ?? null;
+    $user_id = $data['user_id'] ?? null;
+    $courses = $data['courses'] ?? null;
+
+    if (!$registration_id || !$master_file_id || !$user_id || !$courses) {
+        echo json_encode(['success' => false, 'error' => 'Missing parameters']);
+        http_response_code(400);
+        exit;
+    }
+
+    $result = $registration->updateRegistration($registration_id, $master_file_id, $user_id, $courses);
+
+    if ($result) {
+        echo json_encode(['success' => true]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Could not update registration']);
+    }
+    exit;
 }
+
 
 

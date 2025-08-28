@@ -47,7 +47,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
  else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
 
-    // ---------- Batch insert ----------
     if (isset($input['students']) && is_array($input['students'])) {
         try {
             $result = $masterFile->insertMultipleStudents($input['students']);
@@ -64,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    // ---------- Update single student ----------
     if (isset($input['master_file_id']) && !empty($input['master_file_id'])) {
         $result = $masterFile->updateStudent($input);
         if ($result) {
@@ -76,7 +74,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    // ---------- Insert single student ----------
     $result = $masterFile->insertStudent($input);
     if ($result) {
         echo json_encode(["message" => "Student inserted successfully"]);
