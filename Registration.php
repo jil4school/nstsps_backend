@@ -94,28 +94,58 @@ class Registration
         return $student;
     }
 
-    public function updateRegistration($registration_id, $master_file_id, $user_id, $courses)
+    public function updateRegistration($registration_id, $master_file_id, $user_id, $courses, $deleted = [])
     {
         try {
             $this->conn->beginTransaction();
 
             foreach ($courses as $course) {
-                $sql = "UPDATE reg_courses 
-                       SET course_id = :course_id
-                     WHERE registration_id = :registration_id 
-                       AND master_file_id = :master_file_id 
-                       AND user_id = :user_id 
-                       AND reg_courses_id = :reg_courses_id";
+                if (!empty($course['reg_courses_id'])) {
+                    // 🔹 Existing row → UPDATE
+                    $sql = "UPDATE reg_courses 
+                        SET course_id = :course_id
+                        WHERE registration_id = :registration_id 
+                          AND master_file_id = :master_file_id 
+                          AND user_id = :user_id 
+                          AND reg_courses_id = :reg_courses_id";
 
-                $stmt = $this->conn->prepare($sql);
-                $stmt->bindParam(':course_id', $course['course_id'], PDO::PARAM_INT);
-                $stmt->bindParam(':registration_id', $registration_id, PDO::PARAM_INT);
-                $stmt->bindParam(':master_file_id', $master_file_id, PDO::PARAM_INT);
-                $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
-                $stmt->bindParam(':reg_courses_id', $course['reg_courses_id'], PDO::PARAM_INT);
-                // ✅ each row must know which reg_courses_id to update
+                    $stmt = $this->conn->prepare($sql);
+                    $stmt->bindParam(':course_id', $course['course_id'], PDO::PARAM_INT);
+                    $stmt->bindParam(':registration_id', $registration_id, PDO::PARAM_INT);
+                    $stmt->bindParam(':master_file_id', $master_file_id, PDO::PARAM_INT);
+                    $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+                    $stmt->bindParam(':reg_courses_id', $course['reg_courses_id'], PDO::PARAM_INT);
+                    $stmt->execute();
+                } else {
+                    // 🔹 New row → INSERT
+                    $sql = "INSERT INTO reg_courses (registration_id, master_file_id, user_id, course_id)
+                        VALUES (:registration_id, :master_file_id, :user_id, :course_id)";
 
-                $stmt->execute();
+                    $stmt = $this->conn->prepare($sql);
+                    $stmt->bindParam(':registration_id', $registration_id, PDO::PARAM_INT);
+                    $stmt->bindParam(':master_file_id', $master_file_id, PDO::PARAM_INT);
+                    $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+                    $stmt->bindParam(':course_id', $course['course_id'], PDO::PARAM_INT);
+                    $stmt->execute();
+                }
+            }
+
+            // ✅ Handle deletions
+            if (!empty($deleted)) {
+                $sqlDelete = "DELETE FROM reg_courses 
+                          WHERE reg_courses_id = :reg_courses_id
+                            AND registration_id = :registration_id 
+                            AND master_file_id = :master_file_id 
+                            AND user_id = :user_id";
+                $stmtDelete = $this->conn->prepare($sqlDelete);
+
+                foreach ($deleted as $id) {
+                    $stmtDelete->bindParam(':reg_courses_id', $id, PDO::PARAM_INT);
+                    $stmtDelete->bindParam(':registration_id', $registration_id, PDO::PARAM_INT);
+                    $stmtDelete->bindParam(':master_file_id', $master_file_id, PDO::PARAM_INT);
+                    $stmtDelete->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+                    $stmtDelete->execute();
+                }
             }
 
             $this->conn->commit();
@@ -123,6 +153,89 @@ class Registration
         } catch (Exception $e) {
             $this->conn->rollBack();
             error_log("Update registration error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function insertMultipleRegistrations(array $registrations)
+    {
+        try {
+            $this->conn->beginTransaction();
+
+            foreach ($registrations as $reg) {
+                // 1. Get master_file_id and user_id from master_file using student_id
+                $stmtMF = $this->conn->prepare("
+                SELECT master_file_id, user_id 
+                FROM `student_info(master_file)` 
+                WHERE student_id = :student_id 
+                LIMIT 1
+            ");
+                $stmtMF->execute([':student_id' => $reg['student_id']]);
+                $student = $stmtMF->fetch(PDO::FETCH_ASSOC);
+
+                if (!$student) {
+                    throw new Exception("Student not found for student_id " . $reg['student_id']);
+                }
+
+                $master_file_id = $student['master_file_id'];
+                $user_id        = $student['user_id'];
+
+                // 2. Get program_id from program table using program name
+                $stmtProg = $this->conn->prepare("
+                SELECT program_id 
+                FROM program 
+                WHERE program_name = :program 
+                LIMIT 1
+            ");
+                $stmtProg->execute([':program' => $reg['program']]);
+                $program = $stmtProg->fetch(PDO::FETCH_ASSOC);
+
+                if (!$program) {
+                    throw new Exception("Program not found: " . $reg['program']);
+                }
+
+                $program_id = $program['program_id'];
+
+                // 3. Insert registration (fixed column names)
+                $sql = "INSERT INTO `student_info(registration)` 
+                (master_file_id, user_id, registration_date, school_year, year_level, sem, program_id) 
+                VALUES (:master_file_id, :user_id, :registration_date, :school_year, :year_level, :sem, :program_id)";
+
+                $stmtInsert = $this->conn->prepare($sql);
+                $stmtInsert->execute([
+                    ':master_file_id'    => $master_file_id,
+                    ':user_id'           => $user_id,
+                    ':registration_date' => $reg['registration_date'] ?? null,
+                    ':school_year'       => $reg['school_year'] ?? null,
+                    ':year_level'        => $reg['year_level'] ?? null,
+                    ':sem'               => $reg['sem'] ?? null,
+                    ':program_id'        => $program_id,
+                ]);
+
+                $newRegId = $this->conn->lastInsertId();
+
+                // 4. Optionally handle batch courses
+                if (!empty($reg['courses']) && is_array($reg['courses'])) {
+                    $sqlCourses = "INSERT INTO reg_courses (registration_id, master_file_id, user_id, course_id)
+                               VALUES (:registration_id, :master_file_id, :user_id, :course_id)";
+                    $stmtCourses = $this->conn->prepare($sqlCourses);
+
+                    foreach ($reg['courses'] as $course) {
+                        $stmtCourses->execute([
+                            ':registration_id' => $newRegId,
+                            ':master_file_id'  => $master_file_id,
+                            ':user_id'         => $user_id,
+                            ':course_id'       => $course['course_id'],
+                        ]);
+                    }
+                }
+            }
+
+            $this->conn->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            error_log("Batch registration insert failed: " . $e->getMessage());
             return false;
         }
     }
