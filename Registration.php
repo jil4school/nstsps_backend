@@ -157,66 +157,61 @@ class Registration
         }
     }
 
-public function insertMultipleRegistrations(array $registrations)
-{
-    try {
-        $this->conn->beginTransaction();
-        $results = []; // store details for frontend
+    public function insertMultipleRegistrations(array $registrations)
+    {
+        try {
+            $this->conn->beginTransaction();
+            $results = [];
+            $amount_paid = 0;
 
-        foreach ($registrations as $reg) {
-            // 1. Get master_file_id and user_id from master_file using student_id
-            $stmtMF = $this->conn->prepare("
+            foreach ($registrations as $reg) {
+                // 1. Get master_file_id and user_id
+                $stmtMF = $this->conn->prepare("
                 SELECT master_file_id, user_id 
                 FROM `student_info(master_file)` 
                 WHERE student_id = :student_id 
                 LIMIT 1
             ");
-            $stmtMF->execute([':student_id' => $reg['student_id']]);
-            $student = $stmtMF->fetch(PDO::FETCH_ASSOC);
+                $stmtMF->execute([':student_id' => $reg['student_id']]);
+                $student = $stmtMF->fetch(PDO::FETCH_ASSOC);
+                if (!$student) {
+                    throw new Exception("Student not found for student_id " . $reg['student_id']);
+                }
+                $master_file_id = $student['master_file_id'];
+                $user_id        = $student['user_id'];
 
-            if (!$student) {
-                throw new Exception("Student not found for student_id " . $reg['student_id']);
-            }
-
-            $master_file_id = $student['master_file_id'];
-            $user_id        = $student['user_id'];
-
-            // 2. Get program_id from program table using program name
-            $stmtProg = $this->conn->prepare("
+                // 2. Get program_id
+                $stmtProg = $this->conn->prepare("
                 SELECT program_id 
                 FROM program 
                 WHERE program_name = :program 
                 LIMIT 1
             ");
-            $stmtProg->execute([':program' => $reg['program']]);
-            $program = $stmtProg->fetch(PDO::FETCH_ASSOC);
+                $stmtProg->execute([':program' => $reg['program']]);
+                $program = $stmtProg->fetch(PDO::FETCH_ASSOC);
+                if (!$program) {
+                    throw new Exception("Program not found: " . $reg['program']);
+                }
+                $program_id = $program['program_id'];
 
-            if (!$program) {
-                throw new Exception("Program not found: " . $reg['program']);
-            }
-
-            $program_id = $program['program_id'];
-
-            // 3. Insert registration
-            $sql = "INSERT INTO `student_info(registration)` 
+                // 3. Insert registration
+                $sql = "INSERT INTO `student_info(registration)` 
                 (master_file_id, user_id, registration_date, school_year, year_level, sem, program_id) 
                 VALUES (:master_file_id, :user_id, :registration_date, :school_year, :year_level, :sem, :program_id)";
+                $stmtInsert = $this->conn->prepare($sql);
+                $stmtInsert->execute([
+                    ':master_file_id'    => $master_file_id,
+                    ':user_id'           => $user_id,
+                    ':registration_date' => $reg['registration_date'] ?? null,
+                    ':school_year'       => $reg['school_year'] ?? null,
+                    ':year_level'        => $reg['year_level'] ?? null,
+                    ':sem'               => $reg['sem'] ?? null,
+                    ':program_id'        => $program_id,
+                ]);
+                $newRegId = $this->conn->lastInsertId();
 
-            $stmtInsert = $this->conn->prepare($sql);
-            $stmtInsert->execute([
-                ':master_file_id'    => $master_file_id,
-                ':user_id'           => $user_id,
-                ':registration_date' => $reg['registration_date'] ?? null,
-                ':school_year'       => $reg['school_year'] ?? null,
-                ':year_level'        => $reg['year_level'] ?? null,
-                ':sem'               => $reg['sem'] ?? null,
-                ':program_id'        => $program_id,
-            ]);
-
-            $newRegId = $this->conn->lastInsertId();
-
-            // 4. Auto-fetch all courses for this program/year_level/sem
-            $stmtCoursesFetch = $this->conn->prepare("
+                // 4. Fetch program courses
+                $stmtCoursesFetch = $this->conn->prepare("
                 SELECT c.course_id, c.course_code, c.course_description, c.unit
                 FROM program_courses pc
                 JOIN courses c ON pc.course_id = c.course_id
@@ -224,46 +219,94 @@ public function insertMultipleRegistrations(array $registrations)
                   AND pc.year_level = :year_level 
                   AND pc.sem = :sem
             ");
-            $stmtCoursesFetch->execute([
-                ':program_id' => $program_id,
-                ':year_level' => $reg['year_level'],
-                ':sem'        => $reg['sem'],
-            ]);
-            $courses = $stmtCoursesFetch->fetchAll(PDO::FETCH_ASSOC);
+                $stmtCoursesFetch->execute([
+                    ':program_id' => $program_id,
+                    ':year_level' => $reg['year_level'],
+                    ':sem'        => $reg['sem'],
+                ]);
+                $courses = $stmtCoursesFetch->fetchAll(PDO::FETCH_ASSOC);
 
-            // 5. Insert each course into reg_courses
-            if ($courses) {
-                $sqlCourses = "INSERT INTO reg_courses (registration_id, master_file_id, user_id, course_id)
+                if ($courses) {
+                    $sqlCourses = "INSERT INTO reg_courses (registration_id, master_file_id, user_id, course_id)
                                VALUES (:registration_id, :master_file_id, :user_id, :course_id)";
-                $stmtCourses = $this->conn->prepare($sqlCourses);
+                    $stmtCourses = $this->conn->prepare($sqlCourses);
+                    foreach ($courses as $course) {
+                        $stmtCourses->execute([
+                            ':registration_id' => $newRegId,
+                            ':master_file_id'  => $master_file_id,
+                            ':user_id'         => $user_id,
+                            ':course_id'       => $course['course_id'],
+                        ]);
+                    }
+                }
 
-                foreach ($courses as $course) {
-                    $stmtCourses->execute([
+                // 5. ✅ Insert into accounting
+                $stmtTuition = $this->conn->prepare("
+                SELECT tuition_id, tuition_fee
+                FROM program_tuition_fee
+                WHERE program_id = :program_id
+                  AND year_level = :year_level
+                  AND sem = :sem
+                LIMIT 1
+            ");
+                $stmtTuition->execute([
+                    ':program_id' => $program_id,
+                    ':year_level' => $reg['year_level'],
+                    ':sem'        => $reg['sem'],
+                ]);
+                $tuition = $stmtTuition->fetch(PDO::FETCH_ASSOC);
+
+                if ($tuition) {
+                    $tuition_id  = $tuition['tuition_id'];
+                    $tuition_fee = (float) $tuition['tuition_fee'];
+
+                    // ✅ Handle amount_paid
+                    $amount_paid = isset($reg['amount_paid']) && $reg['amount_paid'] > 0
+                        ? (float) $reg['amount_paid']
+                        : 0;
+
+                    // ✅ Balance logic
+                    if ($amount_paid <= 0) {
+                        $balance = $tuition_fee; // no payment or 0, full tuition as balance
+                    } else {
+                        $balance = $tuition_fee - $amount_paid;
+                        if ($balance < 0) {
+                            $balance = 0; // prevent negative balance if overpaid
+                        }
+                    }
+
+                    $stmtAcc = $this->conn->prepare("
+                    INSERT INTO accounting (user_id, master_file_id, registration_id, tuition_id, balance, amount_paid)
+                    VALUES (:user_id, :master_file_id, :registration_id, :tuition_id, :balance, :amount_paid)
+                ");
+                    $stmtAcc->execute([
+                        ':user_id'        => $user_id,
+                        ':master_file_id' => $master_file_id,
                         ':registration_id' => $newRegId,
-                        ':master_file_id'  => $master_file_id,
-                        ':user_id'         => $user_id,
-                        ':course_id'       => $course['course_id'],
+                        ':tuition_id'     => $tuition_id,
+                        ':balance'        => $balance,
+                        ':amount_paid'    => $amount_paid,
                     ]);
                 }
+
+                // Collect results
+                $results[] = [
+                    'student_id'     => $reg['student_id'],
+                    'registration_id' => $newRegId,
+                    'program_id'     => $program_id,
+                    'year_level'     => $reg['year_level'],
+                    'sem'            => $reg['sem'],
+                    'courses'        => $courses,
+                    'amount_paid'    => $amount_paid,
+                ];
             }
 
-            // ✅ Collect result for this student
-            $results[] = [
-                'student_id'     => $reg['student_id'],
-                'registration_id'=> $newRegId,
-                'program_id'     => $program_id,
-                'year_level'     => $reg['year_level'],
-                'sem'            => $reg['sem'],
-                'courses'        => $courses, // full list with course_code + description
-            ];
+            $this->conn->commit();
+            return $results;
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            error_log("Batch registration insert failed: " . $e->getMessage());
+            return ['error' => $e->getMessage()];
         }
-
-        $this->conn->commit();
-        return $results; // return detailed info
-    } catch (Exception $e) {
-        $this->conn->rollBack();
-        error_log("Batch registration insert failed: " . $e->getMessage());
-        return ['error' => $e->getMessage()];
     }
-}
 }
