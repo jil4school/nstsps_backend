@@ -15,6 +15,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $registration = new Registration();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+
+    if (isset($_GET['action']) && $_GET['action'] === 'get_courses') {
+        if (!isset($_GET['registration_id'], $_GET['master_file_id'], $_GET['user_id'])) {
+            http_response_code(400);
+            echo json_encode(["error" => "Missing parameters"]);
+            exit;
+        }
+
+        $registration_id = $_GET['registration_id'];
+        $master_file_id  = $_GET['master_file_id'];
+        $user_id         = $_GET['user_id'];
+
+        $data = $registration->getCoursesByRegistration($registration_id, $master_file_id, $user_id);
+
+        echo json_encode($data);
+        exit;
+    }
+    
     if (isset($_GET['registration_id'], $_GET['master_file_id'])) {
         $registration_id = $_GET['registration_id'];
         $master_file_id  = $_GET['master_file_id'];

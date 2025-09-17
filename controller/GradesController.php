@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../Grades.php';
 
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, OPTIONS");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -31,4 +31,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
     echo json_encode(["error" => "Missing parameters: master_file_id and registration_id required."]);
     http_response_code(400);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $input = json_decode(file_get_contents("php://input"), true);
+
+    if (!$input || !isset($input['grades'])) {
+        echo json_encode(["error" => "Invalid payload. Expecting 'grades' array."]);
+        http_response_code(400);
+        exit;
+    }
+
+    $results = [];
+    foreach ($input['grades'] as $g) {
+        $result = $grades->saveGrade(
+            $input['user_id'],
+            $input['master_file_id'],
+            $input['registration_id'],
+            $g['course_id'],
+            $g['grade']
+        );
+        $results[] = $result;
+    }
+
+    echo json_encode([
+        "success" => true,
+        "message" => "Grades processed successfully",
+        "results" => $results
+    ]);
 }

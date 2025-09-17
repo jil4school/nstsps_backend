@@ -18,15 +18,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         if (isset($_GET['user_id']) && is_numeric($_GET['user_id'])) {
             $user_id = intval($_GET['user_id']);
             $data = $accounting->getAccountingByUserId($user_id);
+
+            // always return as single object
+            echo json_encode([
+                "total_balance" => (float)($data['total_balance'] ?? 0),
+                "latest_school_year" => $data['latest_school_year'] ?? null,
+                "latest_sem" => $data['latest_sem'] ?? null
+            ]);
         } else {
             $data = $accounting->getAllAccountingRecords();
-        }
-
-        if ($data && count($data) > 0) {
             echo json_encode($data);
-        } else {
-            echo json_encode([]);
-            http_response_code(200);
         }
     } catch (PDOException $e) {
         http_response_code(500);
@@ -37,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     }
     exit;
 }
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents("php://input"), true);

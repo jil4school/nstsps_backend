@@ -309,4 +309,34 @@ class Registration
             return ['error' => $e->getMessage()];
         }
     }
+
+    public function getCoursesByRegistration($registration_id, $master_file_id, $user_id)
+    {
+        $query = "SELECT rc.reg_courses_id,
+                     c.course_id,
+                     c.course_code,
+                     c.course_description,
+                     c.unit,
+                     g.grade
+              FROM `reg_courses` rc
+              JOIN courses c 
+                     ON rc.course_id = c.course_id
+              LEFT JOIN `student_info(grades)` g 
+                     ON g.registration_id = rc.registration_id
+                    AND g.master_file_id = rc.master_file_id
+                    AND g.user_id = rc.user_id
+                    AND g.course_id = rc.course_id
+              WHERE rc.registration_id = :registration_id
+                AND rc.master_file_id = :master_file_id
+                AND rc.user_id = :user_id";
+
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute([
+            ':registration_id' => $registration_id,
+            ':master_file_id' => $master_file_id,
+            ':user_id' => $user_id
+        ]);
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
