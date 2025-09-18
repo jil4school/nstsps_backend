@@ -1,10 +1,8 @@
 <?php
 
-require_once __DIR__ . '/../Registration.php';
-
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Content-Type: application/json; charset=UTF-8");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -12,6 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+require_once __DIR__ . '/../Registration.php';
 $registration = new Registration();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -32,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo json_encode($data);
         exit;
     }
-    
+
     if (isset($_GET['registration_id'], $_GET['master_file_id'])) {
         $registration_id = $_GET['registration_id'];
         $master_file_id  = $_GET['master_file_id'];
@@ -77,8 +76,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $data = json_decode(file_get_contents("php://input"), true);
 
     // ✅ Batch insert (supports both `registrations` only or `action: batch_insert`)
-    if ((isset($data['registrations']) && is_array($data['registrations'])) || 
-        (isset($data['action']) && $data['action'] === 'batch_insert')) {
+    if ((isset($data['registrations']) && is_array($data['registrations'])) ||
+        (isset($data['action']) && $data['action'] === 'batch_insert')
+    ) {
         try {
             $registrations = $data['registrations'] ?? [];
             if (!empty($registrations)) {

@@ -104,7 +104,7 @@ class MasterFile
             $stmtAccount = $this->conn->prepare($sqlAccount);
             $stmtAccount->execute([
                 ':email' => $data['email'],
-                ':password' => null, 
+                ':password' => null,
                 ':role' => 'student'
             ]);
 
@@ -254,7 +254,7 @@ class MasterFile
             foreach ($students as $student) {
                 $accountStmt->execute([
                     ':email' => $student['email'],
-                    ':role'  => $student['role'] ?? 'student', 
+                    ':role'  => $student['role'] ?? 'student',
                 ]);
                 $userId = $this->conn->lastInsertId();
 
@@ -324,5 +324,51 @@ class MasterFile
         ]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    public function getLatestEnrollmentWithMaster($user_id)
+    {
+        $sql = "SELECT 
+    rr.registration_id,
+    rr.registration_date,
+    rr.school_year,
+    rr.year_level,
+    rr.sem,
+    rr.program_id AS rr_program_id,
+    s.master_file_id,
+    s.student_id,
+    s.program_id AS s_program_id,
+    s.surname,
+    s.first_name,
+    s.middle_name,
+    s.gender,
+    s.nationality,
+    s.civil_status,
+    s.religion,
+    s.birthday,
+    s.birthplace,
+    s.street,
+    s.barangay,
+    s.region,
+    s.municipality,
+    s.mobile_number,
+    s.guardian_surname,
+    s.guardian_first_name,
+    s.relation_with_the_student,
+    s.guardian_mobile_number,
+    s.guardian_email,
+    p.program_name
+FROM `student_info(registration)` rr
+LEFT JOIN `student_info(master_file)` s ON rr.user_id = s.user_id
+LEFT JOIN program p ON rr.program_id = p.program_id
+WHERE rr.user_id = :user_id
+ORDER BY rr.registration_date DESC
+LIMIT 1";
+
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':user_id', $user_id, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 }

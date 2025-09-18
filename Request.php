@@ -27,9 +27,9 @@ class Request
         }
 
         $sql = "INSERT INTO request_form 
-        (user_id, master_file_id, request, request_remarks, request_purpose, mode_of_payment, receipt) 
+        (user_id, master_file_id, request, request_remarks, request_purpose, mode_of_payment, receipt, status) 
         VALUES 
-        (:user_id, :master_file_id, :request, :request_remarks, :request_purpose, :mode_of_payment, :receipt)";
+        (:user_id, :master_file_id, :request, :request_remarks, :request_purpose, :mode_of_payment, :receipt, :status)";
 
         $stmt = $this->conn->prepare($sql);
 
@@ -40,9 +40,11 @@ class Request
             ':request_remarks' => $data['request_remarks'],
             ':request_purpose' => $data['request_purpose'],
             ':mode_of_payment' => $data['mode_of_payment'],
-            ':receipt' => $fileName
+            ':receipt' => $fileName,
+            ':status' => 'Pending'   // 🔥 always pending when new
         ]);
     }
+
     public function getAllRequests()
     {
         $sql = "SELECT 
@@ -78,17 +80,15 @@ class Request
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
     public function updateRequestStatus($requestId, $status): bool
-{
-    $sql = "UPDATE request_form 
+    {
+        $sql = "UPDATE request_form 
             SET status = :status 
             WHERE request_id = :request_id";
 
-    $stmt = $this->conn->prepare($sql);
-    return $stmt->execute([
-        ':status' => $status,
-        ':request_id' => $requestId
-    ]);
+        $stmt = $this->conn->prepare($sql);
+        return $stmt->execute([
+            ':status' => $status,
+            ':request_id' => $requestId
+        ]);
+    }
 }
-
-}
-

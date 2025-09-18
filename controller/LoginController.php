@@ -1,8 +1,14 @@
 <?php
-header("Access-Control-Allow-Origin: *"); 
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Access-Control-Allow-Credentials: true");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit;
+}
+
 require_once __DIR__ . '/Controller.php';
 
 class LoginController extends Controller
@@ -29,22 +35,22 @@ class LoginController extends Controller
         }
     }
 
-    public function verifyOldPassword($user_id, $oldPassword)
-    {
-        $this->setStatement("SELECT password FROM student_account WHERE user_id = :user_id");
-        $this->statement->execute(['user_id' => $user_id]);
-        $user = $this->statement->fetch(PDO::FETCH_ASSOC);
+public function verifyOldPassword($user_id, $oldPassword)
+{
+    $this->setStatement("SELECT password FROM student_account WHERE user_id = :user_id");
+    $this->statement->execute(['user_id' => $user_id]);
+    $user = $this->statement->fetch(PDO::FETCH_ASSOC);
 
-        if ($user) {
-            if ($user['password'] === $oldPassword) {
-                return ['match' => true];
-            } else {
-                return ['match' => false];
-            }
+    if ($user) {
+        if ($user['password'] === $oldPassword) {
+            return ['match' => true];
         } else {
-            return ['error' => 'User not found'];
+            return ['error' => 'Old password is incorrect'];
         }
+    } else {
+        return ['error' => 'User not found'];
     }
+}
 
     public function updatePassword($user_id, $newPassword)
     {

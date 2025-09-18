@@ -1,17 +1,8 @@
 <?php
 
-require_once __DIR__ . '/../MasterFile.php';
-
-
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if ($origin === 'http://localhost:5173') {
-    header("Access-Control-Allow-Origin: $origin");
-} else {
-    header("Access-Control-Allow-Origin: http://localhost");
-}
-header("Access-Control-Allow-Origin: *"); 
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 header("Access-Control-Allow-Credentials: true");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -19,11 +10,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+require_once __DIR__ . '/../MasterFile.php';
 
 $masterFile = new MasterFile();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    if (isset($_GET['user_id']) && !empty($_GET['user_id'])) {
+    // Check latest enrollment first
+    if (isset($_GET['latest_enrollment']) && $_GET['latest_enrollment'] === '1' && !empty($_GET['user_id'])) {
+        $data = $masterFile->getLatestEnrollmentWithMaster($_GET['user_id']);
+        if ($data) {
+            echo json_encode($data);
+        } else {
+            echo json_encode(["error" => "No enrollment found"]);
+            http_response_code(404);
+        }
+        exit;
+    }
+    // Then check regular user_id fetch
+    elseif (isset($_GET['user_id']) && !empty($_GET['user_id'])) {
         $user_id = $_GET['user_id'];
         $data = $masterFile->getStudentByUserId($user_id);
 
@@ -43,8 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $data = $masterFile->getAllStudents();
         echo json_encode($data);
     }
-}
- else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+} else if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
 
     if (isset($input['students']) && is_array($input['students'])) {
@@ -82,4 +85,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         http_response_code(500);
     }
 }
-
