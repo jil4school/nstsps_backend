@@ -99,6 +99,7 @@ class MasterFile
         try {
             $this->conn->beginTransaction();
 
+            // 1. Insert into student_account
             $sqlAccount = "INSERT INTO student_account (email, password, role) 
                        VALUES (:email, :password, :role)";
             $stmtAccount = $this->conn->prepare($sqlAccount);
@@ -107,57 +108,22 @@ class MasterFile
                 ':password' => null,
                 ':role' => 'student'
             ]);
-
             $user_id = $this->conn->lastInsertId();
 
+            // 2. Insert into student_info(master_file)
             $sqlInfo = "INSERT INTO `student_info(master_file)` (
-            user_id,
-            student_id,
-            program_id,
-            surname,
-            first_name,
-            middle_name,
-            gender,
-            nationality,
-            civil_status,
-            religion,
-            birthday,
-            birthplace,
-            street,
-            barangay,
-            region,
-            municipality,
-            mobile_number,
-            guardian_surname,
-            guardian_first_name,
-            relation_with_the_student,
-            guardian_mobile_number,
-            guardian_email
+            user_id, student_id, program_id, surname, first_name, middle_name,
+            gender, nationality, civil_status, religion, birthday, birthplace,
+            street, barangay, region, municipality, mobile_number,
+            guardian_surname, guardian_first_name, relation_with_the_student,
+            guardian_mobile_number, guardian_email
         ) VALUES (
-            :user_id,
-            :student_id,
-            :program_id,
-            :surname,
-            :first_name,
-            :middle_name,
-            :gender,
-            :nationality,
-            :civil_status,
-            :religion,
-            :birthday,
-            :birthplace,
-            :street,
-            :barangay,
-            :region,
-            :municipality,
-            :mobile_number,
-            :guardian_surname,
-            :guardian_first_name,
-            :relation_with_the_student,
-            :guardian_mobile_number,
-            :guardian_email
+            :user_id, :student_id, :program_id, :surname, :first_name, :middle_name,
+            :gender, :nationality, :civil_status, :religion, :birthday, :birthplace,
+            :street, :barangay, :region, :municipality, :mobile_number,
+            :guardian_surname, :guardian_first_name, :relation_with_the_student,
+            :guardian_mobile_number, :guardian_email
         )";
-
             $stmtInfo = $this->conn->prepare($sqlInfo);
             $stmtInfo->execute([
                 ':user_id' => $user_id,
@@ -183,6 +149,78 @@ class MasterFile
                 ':guardian_mobile_number' => $data['guardian_mobile_number'] ?? null,
                 ':guardian_email' => $data['guardian_email'] ?? null,
             ]);
+            $master_file_id = $this->conn->lastInsertId();
+
+            // 3. Insert into student_info(registration)
+            $sqlReg = "INSERT INTO `student_info(registration)` 
+            (user_id, master_file_id, registration_date, school_year, year_level, sem, program_id)
+            VALUES (:user_id, :master_file_id, :registration_date, :school_year, :year_level, :sem, :program_id)";
+            $stmtReg = $this->conn->prepare($sqlReg);
+            $registration_date = date('Y-m-d');
+            $stmtReg->execute([
+                ':user_id' => $user_id,
+                ':master_file_id' => $master_file_id,
+                ':registration_date' => $registration_date,
+                ':school_year' => $data['school_year'] ?? null,
+                ':year_level' => $data['year_level'] ?? null,
+                ':sem' => $data['sem'] ?? null,
+                ':program_id' => $data['program_id'] ?? null
+            ]);
+            $registration_id = $this->conn->lastInsertId();
+
+            // 4. Insert into reg_courses for each course in program_courses
+            $sqlCourses = "SELECT course_id FROM program_courses 
+                       WHERE program_id = :program_id
+                         AND year_level = :year_level
+                         AND sem = :sem";
+            $stmtCourses = $this->conn->prepare($sqlCourses);
+            $stmtCourses->execute([
+                ':program_id' => $data['program_id'],
+                ':year_level' => $data['year_level'],
+                ':sem' => $data['sem']
+            ]);
+            $courses = $stmtCourses->fetchAll(PDO::FETCH_ASSOC);
+
+            $sqlRegCourse = "INSERT INTO reg_courses 
+            (user_id, master_file_id, registration_id, course_id)
+            VALUES (:user_id, :master_file_id, :registration_id, :course_id)";
+            $stmtRegCourse = $this->conn->prepare($sqlRegCourse);
+
+            foreach ($courses as $course) {
+                $stmtRegCourse->execute([
+                    ':user_id' => $user_id,
+                    ':master_file_id' => $master_file_id,
+                    ':registration_id' => $registration_id,
+                    ':course_id' => $course['course_id']
+                ]);
+            }
+
+            // 5. Insert into accounting with tuition fee
+            $sqlTuition = "SELECT tuition_id, tuition_fee FROM program_tuition_fee 
+                       WHERE program_id = :program_id
+                         AND year_level = :year_level
+                         AND sem = :sem";
+            $stmtTuition = $this->conn->prepare($sqlTuition);
+            $stmtTuition->execute([
+                ':program_id' => $data['program_id'],
+                ':year_level' => $data['year_level'],
+                ':sem' => $data['sem']
+            ]);
+            $tuition = $stmtTuition->fetch(PDO::FETCH_ASSOC);
+
+            if ($tuition) {
+                $sqlAccounting = "INSERT INTO accounting 
+                (user_id, master_file_id, registration_id, tuition_id, balance, amount_paid)
+                VALUES (:user_id, :master_file_id, :registration_id, :tuition_id, :balance, 0)";
+                $stmtAccounting = $this->conn->prepare($sqlAccounting);
+                $stmtAccounting->execute([
+                    ':user_id' => $user_id,
+                    ':master_file_id' => $master_file_id,
+                    ':registration_id' => $registration_id,
+                    ':tuition_id' => $tuition['tuition_id'],
+                    ':balance' => $tuition['tuition_fee']
+                ]);
+            }
 
             $this->conn->commit();
             return true;
@@ -198,90 +236,136 @@ class MasterFile
         try {
             $this->conn->beginTransaction();
 
-            $accountSql = "INSERT INTO student_account (email, role) VALUES (:email, :role)";
+            $accountSql = "INSERT INTO student_account (email, password, role) VALUES (:email, :password, :role)";
             $accountStmt = $this->conn->prepare($accountSql);
 
             $infoSql = "INSERT INTO `student_info(master_file)` (
-            user_id,
-            student_id,
-            program_id,
-            surname,
-            first_name,
-            middle_name,
-            gender,
-            nationality,
-            civil_status,
-            religion,
-            birthday,
-            birthplace,
-            street,
-            barangay,
-            region,
-            municipality,
-            mobile_number,
-            guardian_surname,
-            guardian_first_name,
-            relation_with_the_student,
-            guardian_mobile_number,
-            guardian_email
+            user_id, student_id, program_id, surname, first_name, middle_name,
+            gender, nationality, civil_status, religion, birthday, birthplace,
+            street, barangay, region, municipality, mobile_number,
+            guardian_surname, guardian_first_name, relation_with_the_student,
+            guardian_mobile_number, guardian_email
         ) VALUES (
-            :user_id,
-            :student_id,
-            :program_id,
-            :surname,
-            :first_name,
-            :middle_name,
-            :gender,
-            :nationality,
-            :civil_status,
-            :religion,
-            :birthday,
-            :birthplace,
-            :street,
-            :barangay,
-            :region,
-            :municipality,
-            :mobile_number,
-            :guardian_surname,
-            :guardian_first_name,
-            :relation_with_the_student,
-            :guardian_mobile_number,
-            :guardian_email
+            :user_id, :student_id, :program_id, :surname, :first_name, :middle_name,
+            :gender, :nationality, :civil_status, :religion, :birthday, :birthplace,
+            :street, :barangay, :region, :municipality, :mobile_number,
+            :guardian_surname, :guardian_first_name, :relation_with_the_student,
+            :guardian_mobile_number, :guardian_email
         )";
-
             $infoStmt = $this->conn->prepare($infoSql);
 
             foreach ($students as $student) {
-                $accountStmt->execute([
-                    ':email' => $student['email'],
-                    ':role'  => $student['role'] ?? 'student',
-                ]);
-                $userId = $this->conn->lastInsertId();
+                // 1. Insert account
+                $accountSql = "INSERT INTO student_account (email, password, role) VALUES (:email, :password, :role)";
+                $accountStmt = $this->conn->prepare($accountSql);
 
-                $infoStmt->execute([
-                    ':user_id' => $userId,
-                    ':student_id' => $student['student_id'] ?? null,
-                    ':program_id' => $student['program_id'] ?? null,
-                    ':surname' => $student['surname'] ?? null,
-                    ':first_name' => $student['first_name'] ?? null,
-                    ':middle_name' => $student['middle_name'] ?? null,
-                    ':gender' => $student['gender'] ?? null,
-                    ':nationality' => $student['nationality'] ?? null,
-                    ':civil_status' => $student['civil_status'] ?? null,
-                    ':religion' => $student['religion'] ?? null,
-                    ':birthday' => $student['birthday'] ?? null,
-                    ':birthplace' => $student['birthplace'] ?? null,
-                    ':street' => $student['street'] ?? null,
-                    ':barangay' => $student['barangay'] ?? null,
-                    ':region' => $student['region'] ?? null,
-                    ':municipality' => $student['municipality'] ?? null,
-                    ':mobile_number' => $student['mobile_number'] ?? null,
-                    ':guardian_surname' => $student['guardian_surname'] ?? null,
-                    ':guardian_first_name' => $student['guardian_first_name'] ?? null,
-                    ':relation_with_the_student' => $student['relation_with_the_student'] ?? null,
-                    ':guardian_mobile_number' => $student['guardian_mobile_number'] ?? null,
-                    ':guardian_email' => $student['guardian_email'] ?? null,
-                ]);
+                foreach ($students as $student) {
+                    // Insert account
+                    $accountStmt->execute([
+                        ':email' => $student['email'],
+                        ':password' => $student['password'] ?? null, // or hash it if needed
+                        ':role' => $student['role'] ?? 'student'
+                    ]);
+                    $userId = $this->conn->lastInsertId();
+
+                    // 2. Insert master_file
+                    // 2. Insert master_file
+                    $infoStmt->execute([
+                        ':user_id' => $userId,
+                        ':student_id' => $student['student_id'] ?? null,
+                        ':program_id' => $student['program_id'] ?? null,
+                        ':surname' => $student['surname'] ?? null,
+                        ':first_name' => $student['first_name'] ?? null,
+                        ':middle_name' => $student['middle_name'] ?? null,
+                        ':gender' => $student['gender'] ?? null,
+                        ':nationality' => $student['nationality'] ?? null,
+                        ':civil_status' => $student['civil_status'] ?? null,
+                        ':religion' => $student['religion'] ?? null,
+                        ':birthday' => $student['birthday'] ?? null,
+                        ':birthplace' => $student['birthplace'] ?? null,
+                        ':street' => $student['street'] ?? null,
+                        ':barangay' => $student['barangay'] ?? null,
+                        ':region' => $student['region'] ?? null,
+                        ':municipality' => $student['municipality'] ?? null,
+                        ':mobile_number' => $student['mobile_number'] ?? null,
+                        ':guardian_surname' => $student['guardian_surname'] ?? null,
+                        ':guardian_first_name' => $student['guardian_first_name'] ?? null,
+                        ':relation_with_the_student' => $student['relation_with_the_student'] ?? null,
+                        ':guardian_mobile_number' => $student['guardian_mobile_number'] ?? null,
+                        ':guardian_email' => $student['guardian_email'] ?? null,
+                    ]);
+                    $masterFileId = $this->conn->lastInsertId();
+
+
+                    // 3. Insert registration
+                    $registrationSql = "INSERT INTO `student_info(registration)` 
+                (user_id, master_file_id, registration_date, school_year, year_level, sem, program_id)
+                VALUES (:user_id, :master_file_id, :registration_date, :school_year, :year_level, :sem, :program_id)";
+                    $regStmt = $this->conn->prepare($registrationSql);
+                    $regStmt->execute([
+                        ':user_id' => $userId,
+                        ':master_file_id' => $masterFileId,
+                        ':registration_date' => date('Y-m-d'),
+                        ':school_year' => $student['school_year'] ?? null,
+                        ':year_level' => $student['year_level'] ?? null,
+                        ':sem' => $student['sem'] ?? null,
+                        ':program_id' => $student['program_id'] ?? null
+                    ]);
+                    $registrationId = $this->conn->lastInsertId();
+
+                    // 4. Insert courses
+                    $courseSql = "SELECT course_id FROM program_courses 
+                          WHERE program_id = :program_id
+                          AND year_level = :year_level
+                          AND sem = :sem";
+                    $courseStmt = $this->conn->prepare($courseSql);
+                    $courseStmt->execute([
+                        ':program_id' => $student['program_id'],
+                        ':year_level' => $student['year_level'],
+                        ':sem' => $student['sem']
+                    ]);
+                    $courses = $courseStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    $regCourseSql = "INSERT INTO reg_courses (user_id, master_file_id, registration_id, course_id)
+                             VALUES (:user_id, :master_file_id, :registration_id, :course_id)";
+                    $regCourseStmt = $this->conn->prepare($regCourseSql);
+
+                    foreach ($courses as $course) {
+                        $regCourseStmt->execute([
+                            ':user_id' => $userId,
+                            ':master_file_id' => $masterFileId,
+                            ':registration_id' => $registrationId,
+                            ':course_id' => $course['course_id']
+                        ]);
+                    }
+
+                    // 5. Insert accounting
+                    $tuitionSql = "SELECT tuition_id, tuition_fee FROM program_tuition_fee 
+                           WHERE program_id = :program_id
+                             AND year_level = :year_level
+                             AND sem = :sem";
+                    $tuitionStmt = $this->conn->prepare($tuitionSql);
+                    $tuitionStmt->execute([
+                        ':program_id' => $student['program_id'],
+                        ':year_level' => $student['year_level'],
+                        ':sem' => $student['sem']
+                    ]);
+                    $tuition = $tuitionStmt->fetch(PDO::FETCH_ASSOC);
+
+                    if ($tuition) {
+                        $accountingSql = "INSERT INTO accounting
+                    (user_id, master_file_id, registration_id, tuition_id, balance, amount_paid)
+                    VALUES (:user_id, :master_file_id, :registration_id, :tuition_id, :balance, 0)";
+                        $accStmt = $this->conn->prepare($accountingSql);
+                        $accStmt->execute([
+                            ':user_id' => $userId,
+                            ':master_file_id' => $masterFileId,
+                            ':registration_id' => $registrationId,
+                            ':tuition_id' => $tuition['tuition_id'],
+                            ':balance' => $tuition['tuition_fee']
+                        ]);
+                    }
+                }
             }
 
             $this->conn->commit();
@@ -292,6 +376,7 @@ class MasterFile
             return false;
         }
     }
+
     public function fetchPendingEmails()
     {
         $sql = "SELECT s.*, p.program_name, sa.email
