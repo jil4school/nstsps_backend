@@ -24,12 +24,12 @@ class SPSEmailUpload
 
         for ($i = 2; $i <= count($rows); $i++) {
             $studentId = $rows[$i]['A'] ?? null;
-            $email     = $rows[$i]['F'] ?? null; 
-            $password  = $rows[$i]['G'] ?? null; 
+            $email     = $rows[$i]['F'] ?? null;
+            $password  = $rows[$i]['G'] ?? null;
 
 
             if (!$studentId || !$email) {
-                continue; 
+                continue;
             }
 
             $sqlUser = "SELECT user_id FROM `student_info(master_file)` WHERE student_id = :student_id";
@@ -40,13 +40,19 @@ class SPSEmailUpload
             if ($user) {
                 $userId = $user['user_id'];
 
-                $sqlUpdate = "UPDATE student_account SET email = :email, password = :password WHERE user_id = :user_id";
+                $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+
+                $sqlUpdate = "UPDATE student_account 
+              SET email = :email, password = :password, is_first_login = 1
+              WHERE user_id = :user_id";
                 $stmtUpdate = $this->conn->prepare($sqlUpdate);
                 $stmtUpdate->execute([
                     ':email' => $email,
-                    ':password' => $password,
+                    ':password' => $hashedPassword,
                     ':user_id' => $userId
                 ]);
+
+
 
                 $updatedCount++;
             }
