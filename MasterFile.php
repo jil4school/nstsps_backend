@@ -236,6 +236,7 @@ class MasterFile
         try {
             $this->conn->beginTransaction();
 
+            // Prepare reusable statements once
             $accountSql = "INSERT INTO student_account (email, password, role) VALUES (:email, :password, :role)";
             $accountStmt = $this->conn->prepare($accountSql);
 
@@ -256,78 +257,76 @@ class MasterFile
 
             foreach ($students as $student) {
                 // 1. Insert account
-                $accountSql = "INSERT INTO student_account (email, password, role) VALUES (:email, :password, :role)";
-                $accountStmt = $this->conn->prepare($accountSql);
+                $accountStmt->execute([
+                    ':email' => $student['email'],
+                    ':password' => $student['password'] ?? null,
+                    ':role' => $student['role'] ?? 'student'
+                ]);
+                $userId = $this->conn->lastInsertId();
 
-                foreach ($students as $student) {
-                    // Insert account
-                    $accountStmt->execute([
-                        ':email' => $student['email'],
-                        ':password' => $student['password'] ?? null, // or hash it if needed
-                        ':role' => $student['role'] ?? 'student'
-                    ]);
-                    $userId = $this->conn->lastInsertId();
+                // 2. Insert master file
+                $infoStmt->execute([
+                    ':user_id' => $userId,
+                    ':student_id' => $student['student_id'] ?? null,
+                    ':program_id' => $student['program_id'] ?? null,
+                    ':surname' => $student['surname'] ?? null,
+                    ':first_name' => $student['first_name'] ?? null,
+                    ':middle_name' => $student['middle_name'] ?? null,
+                    ':gender' => $student['gender'] ?? null,
+                    ':nationality' => $student['nationality'] ?? null,
+                    ':civil_status' => $student['civil_status'] ?? null,
+                    ':religion' => $student['religion'] ?? null,
+                    ':birthday' => $student['birthday'] ?? null,
+                    ':birthplace' => $student['birthplace'] ?? null,
+                    ':street' => $student['street'] ?? null,
+                    ':barangay' => $student['barangay'] ?? null,
+                    ':region' => $student['region'] ?? null,
+                    ':municipality' => $student['municipality'] ?? null,
+                    ':mobile_number' => $student['mobile_number'] ?? null,
+                    ':guardian_surname' => $student['guardian_surname'] ?? null,
+                    ':guardian_first_name' => $student['guardian_first_name'] ?? null,
+                    ':relation_with_the_student' => $student['relation_with_the_student'] ?? null,
+                    ':guardian_mobile_number' => $student['guardian_mobile_number'] ?? null,
+                    ':guardian_email' => $student['guardian_email'] ?? null,
+                ]);
+                $masterFileId = $this->conn->lastInsertId();
 
-                    // 2. Insert master_file
-                    // 2. Insert master_file
-                    $infoStmt->execute([
-                        ':user_id' => $userId,
-                        ':student_id' => $student['student_id'] ?? null,
-                        ':program_id' => $student['program_id'] ?? null,
-                        ':surname' => $student['surname'] ?? null,
-                        ':first_name' => $student['first_name'] ?? null,
-                        ':middle_name' => $student['middle_name'] ?? null,
-                        ':gender' => $student['gender'] ?? null,
-                        ':nationality' => $student['nationality'] ?? null,
-                        ':civil_status' => $student['civil_status'] ?? null,
-                        ':religion' => $student['religion'] ?? null,
-                        ':birthday' => $student['birthday'] ?? null,
-                        ':birthplace' => $student['birthplace'] ?? null,
-                        ':street' => $student['street'] ?? null,
-                        ':barangay' => $student['barangay'] ?? null,
-                        ':region' => $student['region'] ?? null,
-                        ':municipality' => $student['municipality'] ?? null,
-                        ':mobile_number' => $student['mobile_number'] ?? null,
-                        ':guardian_surname' => $student['guardian_surname'] ?? null,
-                        ':guardian_first_name' => $student['guardian_first_name'] ?? null,
-                        ':relation_with_the_student' => $student['relation_with_the_student'] ?? null,
-                        ':guardian_mobile_number' => $student['guardian_mobile_number'] ?? null,
-                        ':guardian_email' => $student['guardian_email'] ?? null,
-                    ]);
-                    $masterFileId = $this->conn->lastInsertId();
-
-
-                    // 3. Insert registration
-                    $registrationSql = "INSERT INTO `student_info(registration)` 
+                // 3. Registration insert
+                $registrationSql = "INSERT INTO `student_info(registration)` 
                 (user_id, master_file_id, registration_date, school_year, year_level, sem, program_id)
                 VALUES (:user_id, :master_file_id, :registration_date, :school_year, :year_level, :sem, :program_id)";
-                    $regStmt = $this->conn->prepare($registrationSql);
-                    $regStmt->execute([
-                        ':user_id' => $userId,
-                        ':master_file_id' => $masterFileId,
-                        ':registration_date' => date('Y-m-d'),
-                        ':school_year' => $student['school_year'] ?? null,
-                        ':year_level' => $student['year_level'] ?? null,
-                        ':sem' => $student['sem'] ?? null,
-                        ':program_id' => $student['program_id'] ?? null
-                    ]);
-                    $registrationId = $this->conn->lastInsertId();
+                $regStmt = $this->conn->prepare($registrationSql);
+                $regStmt->execute([
+                    ':user_id' => $userId,
+                    ':master_file_id' => $masterFileId,
+                    ':registration_date' => date('Y-m-d'),
+                    ':school_year' => $student['school_year'] ?? null,
+                    ':year_level' => $student['year_level'] ?? null,
+                    ':sem' => $student['sem'] ?? null,
+                    ':program_id' => $student['program_id'] ?? null
+                ]);
+                $registrationId = $this->conn->lastInsertId();
 
-                    // 4. Insert courses
-                    $courseSql = "SELECT course_id FROM program_courses 
-                          WHERE program_id = :program_id
-                          AND year_level = :year_level
-                          AND sem = :sem";
-                    $courseStmt = $this->conn->prepare($courseSql);
-                    $courseStmt->execute([
-                        ':program_id' => $student['program_id'],
-                        ':year_level' => $student['year_level'],
-                        ':sem' => $student['sem']
-                    ]);
-                    $courses = $courseStmt->fetchAll(PDO::FETCH_ASSOC);
+                // 4. Insert courses
+                $courseSql = "SELECT course_id 
+                            FROM program_courses 
+                            WHERE program_id = :program_id 
+                                AND year_level = :year_level 
+                                AND sem = :sem";
+                $courseStmt = $this->conn->prepare($courseSql);
 
-                    $regCourseSql = "INSERT INTO reg_courses (user_id, master_file_id, registration_id, course_id)
-                             VALUES (:user_id, :master_file_id, :registration_id, :course_id)";
+                $courseStmt->execute([
+                    ':program_id' => $student['program_id'],
+                    ':year_level' => $student['year_level'],
+                    ':sem' => $student['sem']
+                ]);
+
+                $courses = $courseStmt->fetchAll(PDO::FETCH_ASSOC);
+
+                if (!empty($courses)) {
+                    $regCourseSql = "INSERT INTO reg_courses 
+                        (user_id, master_file_id, registration_id, course_id)
+                        VALUES (:user_id, :master_file_id, :registration_id, :course_id)";
                     $regCourseStmt = $this->conn->prepare($regCourseSql);
 
                     foreach ($courses as $course) {
@@ -338,33 +337,40 @@ class MasterFile
                             ':course_id' => $course['course_id']
                         ]);
                     }
+                } else {
+                    // Optional: log if no courses matched
+                    error_log("No courses found for program_id={$student['program_id']}, year_level={$student['year_level']}, sem={$student['sem']}");
+                }
 
-                    // 5. Insert accounting
-                    $tuitionSql = "SELECT tuition_id, tuition_fee FROM program_tuition_fee 
-                           WHERE program_id = :program_id
-                             AND year_level = :year_level
-                             AND sem = :sem";
-                    $tuitionStmt = $this->conn->prepare($tuitionSql);
-                    $tuitionStmt->execute([
-                        ':program_id' => $student['program_id'],
-                        ':year_level' => $student['year_level'],
-                        ':sem' => $student['sem']
+                // 5. Insert accounting
+                $tuitionSql = "SELECT tuition_id, tuition_fee 
+                            FROM program_tuition_fee 
+                            WHERE program_id = :program_id 
+                                AND year_level = :year_level 
+                                AND sem = :sem";
+                $tuitionStmt = $this->conn->prepare($tuitionSql);
+                $tuitionStmt->execute([
+                    ':program_id' => $student['program_id'],
+                    ':year_level' => $student['year_level'],
+                    ':sem' => $student['sem']
+                ]);
+                $tuition = $tuitionStmt->fetch(PDO::FETCH_ASSOC);
+
+                if ($tuition) {
+                    $accountingSql = "INSERT INTO accounting
+                        (user_id, master_file_id, registration_id, tuition_id, balance, amount_paid)
+                        VALUES (:user_id, :master_file_id, :registration_id, :tuition_id, :balance, 0)";
+                    $accStmt = $this->conn->prepare($accountingSql);
+                    $accStmt->execute([
+                        ':user_id' => $userId,
+                        ':master_file_id' => $masterFileId,
+                        ':registration_id' => $registrationId,
+                        ':tuition_id' => $tuition['tuition_id'],
+                        ':balance' => $tuition['tuition_fee']
                     ]);
-                    $tuition = $tuitionStmt->fetch(PDO::FETCH_ASSOC);
-
-                    if ($tuition) {
-                        $accountingSql = "INSERT INTO accounting
-                    (user_id, master_file_id, registration_id, tuition_id, balance, amount_paid)
-                    VALUES (:user_id, :master_file_id, :registration_id, :tuition_id, :balance, 0)";
-                        $accStmt = $this->conn->prepare($accountingSql);
-                        $accStmt->execute([
-                            ':user_id' => $userId,
-                            ':master_file_id' => $masterFileId,
-                            ':registration_id' => $registrationId,
-                            ':tuition_id' => $tuition['tuition_id'],
-                            ':balance' => $tuition['tuition_fee']
-                        ]);
-                    }
+                } else {
+                    // Optional: log if no tuition matched
+                    error_log("No tuition found for program_id={$student['program_id']}, year_level={$student['year_level']}, sem={$student['sem']}");
                 }
             }
 
