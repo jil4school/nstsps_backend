@@ -195,32 +195,7 @@ class MasterFile
                 ]);
             }
 
-            // 5. Insert into accounting with tuition fee
-            $sqlTuition = "SELECT tuition_id, tuition_fee FROM program_tuition_fee 
-                       WHERE program_id = :program_id
-                         AND year_level = :year_level
-                         AND sem = :sem";
-            $stmtTuition = $this->conn->prepare($sqlTuition);
-            $stmtTuition->execute([
-                ':program_id' => $data['program_id'],
-                ':year_level' => $data['year_level'],
-                ':sem' => $data['sem']
-            ]);
-            $tuition = $stmtTuition->fetch(PDO::FETCH_ASSOC);
-
-            if ($tuition) {
-                $sqlAccounting = "INSERT INTO accounting 
-                (user_id, master_file_id, registration_id, tuition_id, balance, amount_paid)
-                VALUES (:user_id, :master_file_id, :registration_id, :tuition_id, :balance, 0)";
-                $stmtAccounting = $this->conn->prepare($sqlAccounting);
-                $stmtAccounting->execute([
-                    ':user_id' => $user_id,
-                    ':master_file_id' => $master_file_id,
-                    ':registration_id' => $registration_id,
-                    ':tuition_id' => $tuition['tuition_id'],
-                    ':balance' => $tuition['tuition_fee']
-                ]);
-            }
+            // 🚫 Removed Step 5: Insert into accounting
 
             $this->conn->commit();
             return true;
@@ -309,10 +284,10 @@ class MasterFile
 
                 // 4. Insert courses
                 $courseSql = "SELECT course_id 
-                            FROM program_courses 
-                            WHERE program_id = :program_id 
-                                AND year_level = :year_level 
-                                AND sem = :sem";
+                        FROM program_courses 
+                        WHERE program_id = :program_id 
+                            AND year_level = :year_level 
+                            AND sem = :sem";
                 $courseStmt = $this->conn->prepare($courseSql);
 
                 $courseStmt->execute([
@@ -325,8 +300,8 @@ class MasterFile
 
                 if (!empty($courses)) {
                     $regCourseSql = "INSERT INTO reg_courses 
-                        (user_id, master_file_id, registration_id, course_id)
-                        VALUES (:user_id, :master_file_id, :registration_id, :course_id)";
+                    (user_id, master_file_id, registration_id, course_id)
+                    VALUES (:user_id, :master_file_id, :registration_id, :course_id)";
                     $regCourseStmt = $this->conn->prepare($regCourseSql);
 
                     foreach ($courses as $course) {
@@ -342,36 +317,7 @@ class MasterFile
                     error_log("No courses found for program_id={$student['program_id']}, year_level={$student['year_level']}, sem={$student['sem']}");
                 }
 
-                // 5. Insert accounting
-                $tuitionSql = "SELECT tuition_id, tuition_fee 
-                            FROM program_tuition_fee 
-                            WHERE program_id = :program_id 
-                                AND year_level = :year_level 
-                                AND sem = :sem";
-                $tuitionStmt = $this->conn->prepare($tuitionSql);
-                $tuitionStmt->execute([
-                    ':program_id' => $student['program_id'],
-                    ':year_level' => $student['year_level'],
-                    ':sem' => $student['sem']
-                ]);
-                $tuition = $tuitionStmt->fetch(PDO::FETCH_ASSOC);
-
-                if ($tuition) {
-                    $accountingSql = "INSERT INTO accounting
-                        (user_id, master_file_id, registration_id, tuition_id, balance, amount_paid)
-                        VALUES (:user_id, :master_file_id, :registration_id, :tuition_id, :balance, 0)";
-                    $accStmt = $this->conn->prepare($accountingSql);
-                    $accStmt->execute([
-                        ':user_id' => $userId,
-                        ':master_file_id' => $masterFileId,
-                        ':registration_id' => $registrationId,
-                        ':tuition_id' => $tuition['tuition_id'],
-                        ':balance' => $tuition['tuition_fee']
-                    ]);
-                } else {
-                    // Optional: log if no tuition matched
-                    error_log("No tuition found for program_id={$student['program_id']}, year_level={$student['year_level']}, sem={$student['sem']}");
-                }
+                // 🚫 Removed Step 5: Insert accounting
             }
 
             $this->conn->commit();
@@ -382,6 +328,7 @@ class MasterFile
             return false;
         }
     }
+
 
     public function fetchPendingEmails()
     {
