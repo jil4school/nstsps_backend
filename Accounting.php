@@ -37,7 +37,7 @@ class Accounting
         $sql = "
         SELECT 
             a.balance_id,
-            a.tuition_id,
+            a.total_tuition_fee,
             a.amount_paid,
             mf.student_id,
             mf.surname,
@@ -66,7 +66,7 @@ class Accounting
 
     /**
      * Update accounting row by balance_id by adding $amount_paid to amount_paid and
-     * recalculating balance = tuition_fee - total_amount_paid
+     * recalculating balance = total_tuition_fee - new_amount_paid
      *
      * @param int $balance_id
      * @param float $amount_paid (amount to add)
@@ -75,12 +75,14 @@ class Accounting
      */
     public function updateBalance($balance_id, $amount_paid)
     {
-        // Start transaction (safe)
         try {
             $this->conn->beginTransaction();
 
-            // 1) fetch accounting row by balance_id
-            $sql = "SELECT balance_id, tuition_id, amount_paid FROM accounting WHERE balance_id = :balance_id LIMIT 1";
+            // 1) Fetch accounting row (now contains total_tuition_fee directly)
+            $sql = "SELECT balance_id, total_tuition_fee, amount_paid 
+                FROM accounting 
+                WHERE balance_id = :balance_id 
+                LIMIT 1";
             $stmt = $this->conn->prepare($sql);
             $stmt->bindParam(':balance_id', $balance_id, PDO::PARAM_INT);
             $stmt->execute();
@@ -90,30 +92,21 @@ class Accounting
                 throw new Exception("Accounting row not found for balance_id: " . $balance_id);
             }
 
-            $tuition_id = (int)$acc['tuition_id'];
+            $tuition_fee = isset($acc['total_tuition_fee']) ? (float)$acc['total_tuition_fee'] : 0.0;
             $existing_paid = isset($acc['amount_paid']) ? (float)$acc['amount_paid'] : 0.0;
             $add_paid = (float)$amount_paid;
+
+            // 2) Add to existing paid
             $new_amount_paid = $existing_paid + $add_paid;
 
-            // 2) fetch tuition_fee from program_tuition_fee using tuition_id
-            $sqlTuition = "SELECT tuition_fee FROM program_tuition_fee WHERE tuition_id = :tuition_id LIMIT 1";
-            $stmtTuition = $this->conn->prepare($sqlTuition);
-            $stmtTuition->bindParam(':tuition_id', $tuition_id, PDO::PARAM_INT);
-            $stmtTuition->execute();
-            $tuitionRow = $stmtTuition->fetch(PDO::FETCH_ASSOC);
-
-            if (!$tuitionRow) {
-                throw new Exception("Tuition row not found for tuition_id: " . $tuition_id);
-            }
-
-            $tuition_fee = (float)$tuitionRow['tuition_fee'];
-
-            // 3) compute new balance
+            // 3) Compute new balance
             $new_balance = $tuition_fee - $new_amount_paid;
             if ($new_balance < 0) $new_balance = 0;
 
-            // 4) update accounting row by balance_id
-            $updateSql = "UPDATE accounting SET amount_paid = :amount_paid, balance = :balance WHERE balance_id = :balance_id";
+            // 4) Update accounting row
+            $updateSql = "UPDATE accounting 
+                      SET amount_paid = :amount_paid, balance = :balance 
+                      WHERE balance_id = :balance_id";
             $updateStmt = $this->conn->prepare($updateSql);
             $updateStmt->bindValue(':amount_paid', $new_amount_paid);
             $updateStmt->bindValue(':balance', $new_balance);
@@ -125,6 +118,100 @@ class Accounting
         } catch (Exception $e) {
             $this->conn->rollBack();
             throw $e;
+        }
+    }
+
+    public function insertAccountingRecord($data)
+    {
+        try {
+            $this->conn->beginTransaction();
+
+            // 1. Find student in master_file by student_id + names
+            $stmtMF = $this->conn->prepare("
+            SELECT master_file_id, user_id, surname, first_name, middle_name
+            FROM `student_info(master_file)`
+            WHERE student_id = :student_id
+            LIMIT 1
+        ");
+            $stmtMF->execute([':student_id' => $data['student_id']]);
+            $student = $stmtMF->fetch(PDO::FETCH_ASSOC);
+
+            if (!$student) {
+                throw new Exception("Student not found with student_id " . $data['student_id']);
+            }
+
+            // strict name check
+            if (
+                strtolower(trim($student['surname'])) !== strtolower(trim($data['surname'])) ||
+                strtolower(trim($student['first_name'])) !== strtolower(trim($data['first_name'])) ||
+                strtolower(trim($student['middle_name'] ?? '')) !== strtolower(trim($data['middle_name'] ?? ''))
+            ) {
+                throw new Exception("Student name does not match records.");
+            }
+
+            $user_id = $student['user_id'];
+            $master_file_id = $student['master_file_id'];
+
+            // 2. Find registration_id
+            $stmtReg = $this->conn->prepare("
+            SELECT registration_id
+            FROM `student_info(registration)`
+            WHERE user_id = :user_id
+              AND master_file_id = :master_file_id
+              AND program_id = :program_id
+              AND year_level = :year_level
+              AND sem = :sem
+              AND school_year = :school_year
+            LIMIT 1
+        ");
+            $stmtReg->execute([
+                ':user_id' => $user_id,
+                ':master_file_id' => $master_file_id,
+                ':program_id' => $data['program_id'],
+                ':year_level' => $data['year_level'],
+                ':sem' => $data['sem'],
+                ':school_year' => $data['school_year']
+            ]);
+            $registration = $stmtReg->fetch(PDO::FETCH_ASSOC);
+
+            if (!$registration) {
+                throw new Exception("Registration not found for the given details.");
+            }
+
+            $registration_id = $registration['registration_id'];
+
+            // 3. Compute balance
+            $total_tuition_fee = (float)$data['total_tuition_fee'];
+            $amount_paid = (float)$data['amount_paid'];
+            $balance = $total_tuition_fee - $amount_paid;
+            if ($balance < 0) $balance = 0;
+
+            // 4. Insert into accounting
+            $stmtAcc = $this->conn->prepare("
+            INSERT INTO accounting 
+            (user_id, master_file_id, registration_id, total_tuition_fee, balance, mode_of_payment, amount_paid)
+            VALUES (:user_id, :master_file_id, :registration_id, :total_tuition_fee, :balance, :mode_of_payment, :amount_paid)
+        ");
+            $stmtAcc->execute([
+                ':user_id' => $user_id,
+                ':master_file_id' => $master_file_id,
+                ':registration_id' => $registration_id,
+                ':total_tuition_fee' => $total_tuition_fee,
+                ':balance' => $balance,
+                ':mode_of_payment' => $data['mode_of_payment'],
+                ':amount_paid' => $amount_paid
+            ]);
+
+            $this->conn->commit();
+
+            return [
+                "success" => true,
+                "balance_id" => $this->conn->lastInsertId(),
+                "balance" => $balance
+            ];
+        } catch (Exception $e) {
+            $this->conn->rollBack();
+            return ["success" => false, "error" => $e->getMessage()];
         }
     }
 }

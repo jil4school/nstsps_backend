@@ -162,7 +162,6 @@ class Registration
         try {
             $this->conn->beginTransaction();
             $results = [];
-            $amount_paid = 0;
 
             foreach ($registrations as $reg) {
                 // 1. Get master_file_id and user_id
@@ -210,7 +209,7 @@ class Registration
                 ]);
                 $newRegId = $this->conn->lastInsertId();
 
-                // 4. Fetch program courses
+                // 4. Fetch program courses and insert into reg_courses
                 $stmtCoursesFetch = $this->conn->prepare("
                 SELECT c.course_id, c.course_code, c.course_description, c.unit
                 FROM program_courses pc
@@ -240,64 +239,14 @@ class Registration
                     }
                 }
 
-                // 5. ✅ Insert into accounting
-                $stmtTuition = $this->conn->prepare("
-                SELECT tuition_id, tuition_fee
-                FROM program_tuition_fee
-                WHERE program_id = :program_id
-                  AND year_level = :year_level
-                  AND sem = :sem
-                LIMIT 1
-            ");
-                $stmtTuition->execute([
-                    ':program_id' => $program_id,
-                    ':year_level' => $reg['year_level'],
-                    ':sem'        => $reg['sem'],
-                ]);
-                $tuition = $stmtTuition->fetch(PDO::FETCH_ASSOC);
-
-                if ($tuition) {
-                    $tuition_id  = $tuition['tuition_id'];
-                    $tuition_fee = (float) $tuition['tuition_fee'];
-
-                    // ✅ Handle amount_paid
-                    $amount_paid = isset($reg['amount_paid']) && $reg['amount_paid'] > 0
-                        ? (float) $reg['amount_paid']
-                        : 0;
-
-                    // ✅ Balance logic
-                    if ($amount_paid <= 0) {
-                        $balance = $tuition_fee; // no payment or 0, full tuition as balance
-                    } else {
-                        $balance = $tuition_fee - $amount_paid;
-                        if ($balance < 0) {
-                            $balance = 0; // prevent negative balance if overpaid
-                        }
-                    }
-
-                    $stmtAcc = $this->conn->prepare("
-                    INSERT INTO accounting (user_id, master_file_id, registration_id, tuition_id, balance, amount_paid)
-                    VALUES (:user_id, :master_file_id, :registration_id, :tuition_id, :balance, :amount_paid)
-                ");
-                    $stmtAcc->execute([
-                        ':user_id'        => $user_id,
-                        ':master_file_id' => $master_file_id,
-                        ':registration_id' => $newRegId,
-                        ':tuition_id'     => $tuition_id,
-                        ':balance'        => $balance,
-                        ':amount_paid'    => $amount_paid,
-                    ]);
-                }
-
-                // Collect results
+                // ✅ Collect results (no accounting insert anymore)
                 $results[] = [
-                    'student_id'     => $reg['student_id'],
+                    'student_id'      => $reg['student_id'],
                     'registration_id' => $newRegId,
-                    'program_id'     => $program_id,
-                    'year_level'     => $reg['year_level'],
-                    'sem'            => $reg['sem'],
-                    'courses'        => $courses,
-                    'amount_paid'    => $amount_paid,
+                    'program_id'      => $program_id,
+                    'year_level'      => $reg['year_level'],
+                    'sem'             => $reg['sem'],
+                    'courses'         => $courses,
                 ];
             }
 
@@ -309,6 +258,7 @@ class Registration
             return ['error' => $e->getMessage()];
         }
     }
+
 
     public function getCoursesByRegistration($registration_id, $master_file_id, $user_id)
     {
