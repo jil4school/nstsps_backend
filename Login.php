@@ -44,6 +44,21 @@ if (isset($input['action']) && $input['action'] === 'deactivate') {
         sendJsonResponse(['error' => 'Failed to deactivate student'], 500);
     }
 }
+// 👉 Handle reactivate
+if (isset($input['action']) && $input['action'] === 'reactivate') {
+    if (!isset($input['user_id'])) {
+        sendJsonResponse(['error' => 'Missing user_id'], 400);
+    }
+
+    $success = $loginController->reactivateStudent($input['user_id']);
+
+    if ($success) {
+        sendJsonResponse(['success' => true, 'message' => 'Student account reactivated']);
+    } else {
+        sendJsonResponse(['error' => 'Failed to reactivate student'], 500);
+    }
+}
+
 
 // 👉 Handle login
 if (!isset($input['email']) || !isset($input['password'])) {

@@ -82,7 +82,8 @@ class MasterFile
     {
         $sql = "SELECT s.*, 
                     p.program_name, 
-                    sa.email
+                    sa.email,
+                    sa.is_first_login
                 FROM `student_info(master_file)` s
                 LEFT JOIN student_account sa 
                     ON s.user_id = sa.user_id

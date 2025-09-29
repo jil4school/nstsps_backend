@@ -90,4 +90,9 @@ class LoginController extends Controller
         $this->setStatement("UPDATE student_account SET is_first_login = 2 WHERE user_id = :user_id");
         return $this->statement->execute(['user_id' => $user_id]);
     }
+    public function reactivateStudent($user_id)
+    {
+        $this->setStatement("UPDATE student_account SET is_first_login = 0 WHERE user_id = :user_id");
+        return $this->statement->execute(['user_id' => $user_id]);
+    }
 }
