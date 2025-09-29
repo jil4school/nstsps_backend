@@ -22,6 +22,12 @@ class LoginController extends Controller
         $user = $this->statement->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
+
+            // ✅ Block deactivated accounts
+            if ($user['is_first_login'] == 2) {
+                return ['error' => 'Your account has been deactivated.'];
+            }
+
             return [
                 'success' => true,
                 'user_id' => $user['user_id'],
@@ -32,6 +38,7 @@ class LoginController extends Controller
             return ['error' => 'Invalid credentials'];
         }
     }
+
 
     public function verifyOldPassword($user_id, $oldPassword)
     {
@@ -76,5 +83,11 @@ class LoginController extends Controller
             'password' => $hashedPassword,
             'user_id'  => $user_id
         ]);
+    }
+
+    public function deactivateStudent($user_id)
+    {
+        $this->setStatement("UPDATE student_account SET is_first_login = 2 WHERE user_id = :user_id");
+        return $this->statement->execute(['user_id' => $user_id]);
     }
 }
