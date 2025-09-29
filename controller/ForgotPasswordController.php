@@ -40,8 +40,8 @@ class ForgotPasswordController
             $mail->isSMTP();
             $mail->Host       = 'smtp.gmail.com';
             $mail->SMTPAuth   = true;
-            $mail->Username   = 'legaspijewel22@gmail.com'; // Gmail
-            $mail->Password   = 'thcihzslblixjblb';        // App password
+            $mail->Username   = 'jildelacruz181@gmail.com'; // Gmail
+            $mail->Password   = 'jrzaakrmqkovduae';        // App password
             $mail->SMTPSecure = 'tls';
             $mail->Port       = 587;
 
