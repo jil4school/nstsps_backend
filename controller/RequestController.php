@@ -15,11 +15,20 @@ require_once __DIR__ . '/../Request.php';
 $request = new Request();
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     try {
-        $requests = $request->getAllRequests();
+        if (isset($_GET['user_id'])) {
+            $user_id = intval($_GET['user_id']);
+            $requests = $request->getRequestsByUserId($user_id);
+        } else {
+            $requests = $request->getAllRequests();
+        }
+
         echo json_encode($requests);
         http_response_code(200);
     } catch (Exception $e) {
-        echo json_encode(["error" => "Failed to fetch requests", "details" => $e->getMessage()]);
+        echo json_encode([
+            "error" => "Failed to fetch requests",
+            "details" => $e->getMessage()
+        ]);
         http_response_code(500);
     }
 } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -66,4 +75,3 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         http_response_code(400);
     }
 }
-

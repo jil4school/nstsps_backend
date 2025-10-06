@@ -91,4 +91,15 @@ class Request
             ':request_id' => $requestId
         ]);
     }
+    public function getRequestsByUserId($user_id)
+    {
+        $sql = "SELECT request, status 
+            FROM request_form 
+            WHERE user_id = :user_id
+            ORDER BY request_id DESC";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->execute([':user_id' => $user_id]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
