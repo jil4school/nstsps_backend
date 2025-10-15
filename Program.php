@@ -58,4 +58,32 @@ class Program
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+    public function getFilteredProgramCourses($program_id, $year_level, $sem)
+    {
+        $sql = "
+        SELECT 
+            pc.program_courses_id,
+            pc.program_id,
+            pc.year_level,
+            pc.sem,
+            c.course_id,
+            c.course_code,
+            c.course_description,
+            c.unit
+        FROM program_courses pc
+        LEFT JOIN courses c ON pc.course_id = c.course_id
+        WHERE pc.program_id = :program_id
+          AND pc.year_level = :year_level
+          AND pc.sem = :sem
+        ORDER BY c.course_code ASC
+    ";
+
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bindParam(':program_id', $program_id, PDO::PARAM_INT);
+        $stmt->bindParam(':year_level', $year_level, PDO::PARAM_STR);
+        $stmt->bindParam(':sem', $sem, PDO::PARAM_STR);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
