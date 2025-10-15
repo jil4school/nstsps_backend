@@ -17,6 +17,8 @@ class Registration
     {
         $sql = "SELECT 
                 s.*, 
+                s.year_level,
+                s.sem,
                 m.surname AS last_name, 
                 m.first_name, 
                 m.middle_name,
@@ -38,6 +40,8 @@ class Registration
         $sql = "SELECT 
                 s.*,
                 s.school_year,
+                s.year_level,
+                s.sem,
                 m.surname AS last_name, 
                 m.first_name, 
                 m.middle_name,
