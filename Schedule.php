@@ -115,4 +115,19 @@ class Schedule
             return ["success" => false, "error" => $e->getMessage()];
         }
     }
+    public function deleteSchedule($schedule_id)
+    {
+        try {
+            $stmt = $this->conn->prepare("DELETE FROM schedules WHERE schedule_id = :schedule_id");
+            $stmt->execute([':schedule_id' => $schedule_id]);
+
+            if ($stmt->rowCount() > 0) {
+                return ["success" => true, "message" => "Schedule deleted successfully"];
+            } else {
+                return ["success" => false, "error" => "No schedule found with the given ID"];
+            }
+        } catch (Exception $e) {
+            return ["success" => false, "error" => $e->getMessage()];
+        }
+    }
 }

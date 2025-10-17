@@ -58,10 +58,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
+
     http_response_code(400);
     echo json_encode(["success" => false, "error" => "Invalid action"]);
     exit;
 }
+if ($_SERVER['REQUEST_METHOD'] === 'DELETE') {
+    $data = json_decode(file_get_contents("php://input"), true);
+    $schedule_id = $data['schedule_id'] ?? null;
+    error_log("Deleting schedule_id: " . $schedule_id);
+
+    if (!$schedule_id) {
+        http_response_code(400);
+        echo json_encode(["success" => false, "error" => "Missing schedule_id"]);
+        exit;
+    }
+
+    try {
+        $result = $schedule->deleteSchedule($schedule_id);
+        if ($result['success']) {
+            echo json_encode($result);
+        } else {
+            http_response_code(400);
+            echo json_encode($result);
+        }
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(["success" => false, "error" => $e->getMessage()]);
+    }
+    exit;
+}
+
 
 http_response_code(405);
 echo json_encode(["error" => "Method not allowed"]);
